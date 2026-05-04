@@ -5,7 +5,8 @@
 #include <godot_cpp/classes/sprite2d.hpp> // TODO: remove. Just for test now.
 #include <godot_cpp/classes/viewport_texture.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
-#include <cstring>
+#include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 
 using namespace godot;
 
@@ -21,27 +22,54 @@ void HPAMasterNode::_ready() {
 	if (Engine::get_singleton()->is_editor_hint())
 		return;
 
-	if (!d_ipc.initialize(d_ipc_name, 100)) {
-		ERR_PRINT("HPAMasterNode: IPC initialization failed. Quitting.");
+	_init_envs();
+
+	std::vector<HPAAgentNode *> agents = _collect_agents();
+
+	// 4 bytes per pixel (RGBA). This will come from the GPU readback format.
+	size_t visual_obs_size = static_cast<size_t>(d_obs_res.x * d_obs_res.y) * 4;
+
+	if (!d_layout.initialize(static_cast<size_t>(d_num_envs), visual_obs_size, agents)) {
+		ERR_PRINT("HPAMasterNode: layout initialization failed. Quitting.");
 		get_tree()->quit();
 		return;
 	}
 
-	_init_envs();
+	if (!d_ipc.initialize(d_ipc_name, d_layout.total_size())) {
+		ERR_PRINT("HPAMasterNode: IPC initialization failed. Quitting.");
+		get_tree()->quit();
+		return;
+	}
+}
+
+void HPAMasterNode::_physics_process(double) {
+	_ipc_exchange();
 }
 
 void HPAMasterNode::_ipc_exchange() {
-	// TODO: maybe something like pausing the whole scene tree should also be
-	// part of this method.
-	d_ipc.write_and_signal([](void *ptr, size_t size) {
-		// TODO: write observations into shared memory
-		std::memset(ptr, 0, size);
+	d_ipc.write_and_signal([this](void *ptr, size_t) {
+		d_layout.write_env_state(ptr);
 	});
-	d_ipc.wait_and_read([](const void *ptr, size_t size) {
-		// TODO: read actions from shared memory
-		(void)ptr;
-		(void)size;
+	d_ipc.wait_and_read([this](const void *ptr, size_t) {
+		d_layout.dispatch_actions(ptr);
 	});
+}
+
+std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
+	std::vector<HPAAgentNode *> agents;
+	int child_count = get_child_count();
+	for (int i = 0; i != child_count; ++i) {
+		SubViewport *sv = Object::cast_to<SubViewport>(get_child(i));
+		if (!sv)
+			continue;
+		TypedArray<Node> found = sv->find_children("*", "HPAAgentNode", true, false);
+		if (found.is_empty()) {
+			ERR_PRINT("HPAMasterNode: no HPAAgentNode found in environment scene.");
+			continue;
+		}
+		agents.push_back(Object::cast_to<HPAAgentNode>(found[0]));
+	}
+	return agents;
 }
 
 void HPAMasterNode::_init_envs() {
@@ -170,5 +198,6 @@ void HPAMasterNode::_bind_methods() {
 		PropertyInfo(Variant::STRING, "ipc_name"),
 		"set_ipc_name", "get_ipc_name");
 
+	ClassDB::bind_method(D_METHOD("_physics_process", "p_delta"), &HPAMasterNode::_physics_process);
 	ClassDB::bind_method(D_METHOD("_ipc_exchange"), &HPAMasterNode::_ipc_exchange);
 }

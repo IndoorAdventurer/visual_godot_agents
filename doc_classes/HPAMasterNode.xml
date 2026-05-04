@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="HPAMasterNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-	The master node for the high performance agents plugin. Should be the one and only node in your main scene.
+	Root node for the high-performance agents plugin. Place one in your main scene.
 	</brief_description>
 	<description>
 		Runs [member num_envs] parallel instances of [member environment_scene] in separate SubViewports, and synchronizes observations and actions with a Python training process via POSIX shared memory and semaphores. The shared memory region and semaphores are identified by [member ipc_name].
-		On [method Node._ready], the node initializes the IPC transport and quits the application if initialization fails. Call [method _ipc_exchange] once per training step to write observations into shared memory, signal Python, wait for Python's action response, and read it back.
+		On [method Node._ready], the node initializes the environments and the IPC transport, and quits the application if initialization fails. Each physics step, [method Node._physics_process] automatically writes observations into shared memory, signals Python, blocks until Python responds with actions, and dispatches those actions to each environment's [HPAAgentNode].
+		Your environment scene must contain exactly one [HPAAgentNode] subclass. The Python process must create the semaphores and open the shared memory region using the same [member ipc_name] before Godot starts.
 	</description>
 	<members>
 		<member name="environment_scene" type="PackedScene" setter="set_env_scene" getter="get_env_scene">
-			The scene that represents the complete simulation environment. One instance is created per parallel environment.
+			The scene representing one environment instance. Must contain exactly one [HPAAgentNode] subclass. One instance is created per parallel environment.
 		</member>
 		<member name="num_envs" type="int" setter="set_num_envs" getter="get_num_envs" default="2">
-			Number of environments to run in parallel.
+			Number of parallel environment instances to run.
 		</member>
 		<member name="obs_resolution" type="Vector2i" setter="set_obs_res" getter="get_obs_res" default="Vector2i(128, 128)">
-			The resolution of the agent's visual observation space.
+			Width and height of the visual observation rendered by each SubViewport. Determines the size of the visual observation block in shared memory.
 		</member>
 		<member name="ipc_name" type="String" setter="set_ipc_name" getter="get_ipc_name" default="&quot;hpa&quot;">
 			Identifier used to name the POSIX shared memory region ([code]/[ipc_name][/code]) and semaphores ([code]/[ipc_name]_env_ready[/code], [code]/[ipc_name]_act_ready[/code]). Must match the name used on the Python side.

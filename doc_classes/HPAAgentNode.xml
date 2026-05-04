@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="HPAAgentNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	Abstract agent endpoint for a single parallel environment. Subclass this in GDScript to implement your environment logic.
+	</brief_description>
+	<description>
+		Place exactly one subclass of [HPAAgentNode] inside your environment scene. [HPAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
+		Override [method _get_scalar_obs_size] and [method _get_action_size] to declare the size of your observation and action spaces in bytes. These are queried once at startup and must remain constant for the lifetime of the node.
+		Override the per-step callbacks to implement your environment's logic.
+	</description>
+	<methods>
+		<method name="_get_scalar_obs_size" qualifiers="virtual">
+			<return type="int" />
+			<description>
+				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node.
+			</description>
+		</method>
+		<method name="_get_action_size" qualifiers="virtual">
+			<return type="int" />
+			<description>
+				Return the size in bytes of the action vector passed to [method _apply_action]. Must be constant for the lifetime of the node.
+			</description>
+		</method>
+		<method name="_collect_scalar_obs" qualifiers="virtual">
+			<return type="PackedByteArray" />
+			<description>
+				Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size].
+			</description>
+		</method>
+		<method name="_apply_action" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="action" type="PackedByteArray" />
+			<description>
+				Decode [param action] and apply it to the environment. Called once per physics step after Python responds with actions.
+			</description>
+		</method>
+		<method name="_get_reward" qualifiers="virtual">
+			<return type="float" />
+			<description>
+				Return the reward earned during this step.
+			</description>
+		</method>
+		<method name="_is_done" qualifiers="virtual">
+			<return type="bool" />
+			<description>
+				Return [code]true[/code] if the episode has ended and the environment should be reset.
+			</description>
+		</method>
+		<method name="_reset" qualifiers="virtual">
+			<return type="void" />
+			<description>
+				Reset the environment to its initial state for a new episode.
+			</description>
+		</method>
+	</methods>
+</class>

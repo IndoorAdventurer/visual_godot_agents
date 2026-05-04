@@ -1,5 +1,6 @@
 #include "register_types.h"
 
+#include "hpa_agent_node.h"
 #include "hpa_master_node.h"
 
 #include <gdextension_interface.h>
@@ -14,6 +15,7 @@ void initialize_high_perf_agents_module(ModuleInitializationLevel p_level) {
 	}
 
 	// GDREGISTER_RUNTIME_CLASS(HighPerfMasterNode);
+	GDREGISTER_CLASS(HPAAgentNode);
 	GDREGISTER_CLASS(HPAMasterNode);
 }
 

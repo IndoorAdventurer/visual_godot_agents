@@ -1,8 +1,11 @@
 #pragma once
 
 #include "ipc_interface.h"
+#include "shared_memory_layout.h"
+#include "hpa_agent_node.h"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <vector>
 
 namespace godot {
 
@@ -19,12 +22,14 @@ namespace godot {
 			Vector2i d_obs_res;           // Resolution of observation space
 			String d_ipc_name;            // Shared name for SHM region and semaphores
 			IPCInterface d_ipc;           // IPC transport to Python
+			SharedMemoryLayout d_layout;  // Binary layout interpreter for shared memory
 
 		public:
 			HPAMasterNode();
 			~HPAMasterNode() = default;
 
 			void _ready() override;
+			void _physics_process(double p_delta) override;
 			PackedStringArray _get_configuration_warnings() const override;
 
 			/**
@@ -33,9 +38,14 @@ namespace godot {
 			void _init_envs();
 
 			/**
+			 * Walks subviewport children and returns the HPAAgentNode found in
+			 * each environment scene. Called in _ready() after _init_envs().
+			 */
+			std::vector<HPAAgentNode *> _collect_agents();
+
+			/**
 			 * Writes observations into shared memory and signals Python, then
 			 * blocks until Python signals back with actions and reads them.
-			 * Both lambdas are stubs until real data layout is wired in.
 			 */
 			void _ipc_exchange();
 
