@@ -23,6 +23,7 @@ namespace godot {
 			String d_ipc_name;            // Shared name for SHM region and semaphores
 			IPCInterface d_ipc;           // IPC transport to Python
 			SharedMemoryLayout d_layout;  // Binary layout interpreter for shared memory
+			bool d_initialized = false;   // Set only after _ready() succeeds fully
 
 		public:
 			HPAMasterNode();

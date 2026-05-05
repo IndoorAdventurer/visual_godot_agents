@@ -24,9 +24,11 @@ bool SharedMemoryLayout::initialize(
         return false;
     }
 
-    size_t scalar_obs_size = agents[0]->_get_scalar_obs_size();
-    size_t action_size     = agents[0]->_get_action_size();
+    size_t scalar_obs_size = agents[0]->get_scalar_obs_size();
+    size_t action_size     = agents[0]->get_action_size();
 
+    // TODO: I feel like scalar_obs_size should allow for 0, as some
+    // environments will only depend on visual observations.
     if (scalar_obs_size == 0 || action_size == 0) {
         ERR_PRINT("SharedMemoryLayout: agent reports zero-size scalar obs or action.");
         return false;
@@ -73,14 +75,14 @@ void SharedMemoryLayout::write_env_state(void *shm) const {
     for (size_t i = 0; i != d_num_envs; ++i) {
         HPAAgentNode *agent = d_agents[i];
 
-        PackedByteArray obs = agent->_collect_scalar_obs();
+        PackedByteArray obs = agent->collect_scalar_obs();
         std::memcpy(scalar_obs_base + i * d_scalar_obs_size,
                     obs.ptr(), d_scalar_obs_size);
 
-        float reward = agent->_get_reward();
+        float reward = agent->get_reward();
         std::memcpy(rewards_base + i * sizeof(float), &reward, sizeof(float));
 
-        uint8_t done = agent->_is_done() ? 1 : 0;
+        uint8_t done = agent->is_done() ? 1 : 0;
         done_flags_base[i] = done;
     }
 }
@@ -93,7 +95,7 @@ void SharedMemoryLayout::dispatch_actions(const void *shm) const {
         PackedByteArray action;
         action.resize(static_cast<int>(d_action_size));
         std::memcpy(action.ptrw(), actions_base + i * d_action_size, d_action_size);
-        d_agents[i]->_apply_action(action);
+        d_agents[i]->apply_action(action);
     }
 }
 

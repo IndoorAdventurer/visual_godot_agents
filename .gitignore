@@ -12,3 +12,8 @@ high-performance-godot-agents/
 
 # Brainstorming/design notes:
 design/
+
+# Python:
+__pycache__/
+*.egg-info/
+.venv/

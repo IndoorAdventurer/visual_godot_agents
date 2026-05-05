@@ -40,9 +40,13 @@ void HPAMasterNode::_ready() {
 		get_tree()->quit();
 		return;
 	}
+
+	d_initialized = true;
 }
 
 void HPAMasterNode::_physics_process(double) {
+	if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
+		return;
 	_ipc_exchange();
 }
 
@@ -198,6 +202,5 @@ void HPAMasterNode::_bind_methods() {
 		PropertyInfo(Variant::STRING, "ipc_name"),
 		"set_ipc_name", "get_ipc_name");
 
-	ClassDB::bind_method(D_METHOD("_physics_process", "p_delta"), &HPAMasterNode::_physics_process);
 	ClassDB::bind_method(D_METHOD("_ipc_exchange"), &HPAMasterNode::_ipc_exchange);
 }

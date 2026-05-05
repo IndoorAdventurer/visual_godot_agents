@@ -2,6 +2,7 @@
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/core/gdvirtual.gen.inc>
 
 namespace godot {
 
@@ -12,6 +13,10 @@ namespace godot {
      *
      * Exactly one HPAAgentNode (or subclass) must exist per environment scene.
      * HPAMasterNode will locate it automatically.
+     *
+     * GDScript subclasses override the underscore-prefixed GDVIRTUAL methods.
+     * C++ callers (e.g. SharedMemoryLayout) use the unprefixed wrapper methods,
+     * which route through Godot's script dispatch so GDScript overrides are found.
      */
     class HPAAgentNode : public Node {
         GDCLASS(HPAAgentNode, Node)
@@ -20,41 +25,27 @@ namespace godot {
             HPAAgentNode() = default;
             ~HPAAgentNode() = default;
 
-            // --- Size queries (override to declare your space sizes in bytes) ---
+            // --- C++ API (used by SharedMemoryLayout) ---
+            // These route through GDVIRTUAL_CALL so GDScript overrides are invoked.
 
-            /**
-             * Size in bytes of the scalar observation vector written by
-             * _collect_scalar_obs(). Must be constant for the lifetime of
-             * the node — SharedMemoryLayout reads this once at init time.
-             */
-            virtual size_t _get_scalar_obs_size();
+            size_t get_scalar_obs_size();
+            size_t get_action_size();
+            void apply_action(PackedByteArray p_action);
+            PackedByteArray collect_scalar_obs();
+            float get_reward();
+            bool is_done();
+            void reset();
 
-            /**
-             * Size in bytes of the action vector received by _apply_action().
-             * Must be constant for the lifetime of the node — SharedMemoryLayout
-             * reads this once at init time.
-             */
-            virtual size_t _get_action_size();
+            // --- GDScript-overridable interface ---
+            // Override these in GDScript to implement your environment logic.
 
-            // --- Per-step callbacks ---
-
-            /** Decode p_action and apply it to the environment. */
-            virtual void _apply_action(PackedByteArray p_action);
-
-            /**
-             * Return the scalar observations for this step as raw bytes.
-             * Length must equal _get_scalar_obs_size().
-             */
-            virtual PackedByteArray _collect_scalar_obs();
-
-            /** Return the reward earned during this step. */
-            virtual float _get_reward();
-
-            /** Return true if the episode has ended. */
-            virtual bool _is_done();
-
-            /** Reset the environment for a new episode. */
-            virtual void _reset();
+            GDVIRTUAL0R(int64_t, _get_scalar_obs_size);
+            GDVIRTUAL0R(int64_t, _get_action_size);
+            GDVIRTUAL1(_apply_action, PackedByteArray);
+            GDVIRTUAL0R(PackedByteArray, _collect_scalar_obs);
+            GDVIRTUAL0R(float, _get_reward);
+            GDVIRTUAL0R(bool, _is_done);
+            GDVIRTUAL0(_reset);
 
         protected:
             static void _bind_methods();

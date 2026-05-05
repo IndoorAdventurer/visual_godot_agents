@@ -25,6 +25,10 @@ class SharedMemoryLayout {
     /**
      * Written at the start of shared memory so Python can derive all offsets
      * without any out-of-band configuration.
+     * 
+     * TODO: we should maybe break down visual_obs_size into more precise
+     * dimensions so on the python side we can directly get the right size
+     * for the array/tensor.
      */
     struct Header {
         uint32_t num_envs;
