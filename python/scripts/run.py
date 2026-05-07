@@ -6,6 +6,8 @@ Usage:
     python scripts/run.py [name]
 
 The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+
+TODO: change the name to something other than run.py. I find that way too abstract
 """
 
 import sys

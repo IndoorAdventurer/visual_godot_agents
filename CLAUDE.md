@@ -6,28 +6,39 @@ in Godot, communicates observations/actions to Python via POSIX shared memory an
 ## Build
 
 ```bash
-scons platform=linux target=editor    # editor build
-scons platform=linux target=template_debug  # debug build
+uv tool run scons platform=linux target=editor          # editor build
+uv tool run scons platform=linux target=template_debug  # debug build
 ```
 
 All `.cpp` files in `src/` are compiled automatically. Generated files go to `src/gen/`.
 
-## Adding a new class
+## Architecture (current)
 
-1. Create `src/my_class.h` and `src/my_class.cpp`
-2. Register it in `src/register_types.cpp` with `GDREGISTER_CLASS(MyClass)`
-3. Add XML documentation to `doc_classes/` if it's a public node
+**Simulation time is fully decoupled from real time.** Godot runs as fast as the CPU/GPU
+allows with a fixed time delta — there is no vsync, no wall-clock pacing, no
+assumption that one tick takes any particular amount of real time. How to implement
+that is still not decided, so for the time being we should make as little assumptions
+about the event loop as possible.
 
-## Naming conventions
+**C++ (GDExtension)**
+- `HPAMasterNode` — root node; owns N SubViewports (one per simulated environment) and is
+  responsible for the IPC exchanges with Python. IPC functionality is delegated to:
+  - `IPCInterface` — manages the low-level POSIX shared memory + semaphores
+  - `SharedMemoryLayout` — manages the data in shared memory: serialises env state and dispatches actions
+- `HPAAgentNode` — GDScript-overridable data gateway for an individual environment: collects observations,
+  rewards and done flags; receives actions
 
-- Class member variables: `d_` prefix (e.g. `d_num_envs`)
-- Method parameters: `p_` prefix (e.g. `p_scene`)
-- Classes: `PascalCase`, methods: `snake_case`
-- Follow Godot GDExtension patterns for `_bind_methods()` and property registration
+Visual observations are read back from each SubViewport's GPU texture and written directly
+into the shared memory visual block (`SharedMemoryLayout::visual_obs_block_ptr`). The
+readback mechanism is not yet decided.
 
-## Architecture
+Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `src/register_types.cpp` and
+XML documentation in `doc_classes/`. Internal C++ components need neither.
 
-- `HPAMasterNode` — root node; owns N SubViewports (one per environment) and one `IPCInterface`
-- `IPCInterface` — POSIX shared memory + semaphores; Python creates semaphores, C++ creates shared memory
-- Semaphore convention: `/<name>_env_ready`, `/<name>_act_ready`
-- Visual data: collected on GPU (compute shader, single readback), sent as one bulk transfer
+**Python** (`python/` — install with `uv sync` from that directory)
+- `godot_hpa/` — Python package; `IPCClient` is the low-level IPC primitive
+- `scripts/` — utility and test scripts
+
+**Startup order**: Python must start first — it creates the semaphores and blocks on `env_ready`.
+Godot then opens the semaphores, creates shared memory, and posts `env_ready`. Python opens the
+shared memory after that post. No further handshake is needed.
