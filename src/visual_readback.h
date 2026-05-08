@@ -31,7 +31,7 @@ namespace godot {
         RID d_shader;
         RID d_pipeline;
         RID d_staging_buffer;
-        RID d_uniform_set;
+        RID d_sampler;
 
         // RS-level texture RIDs, one per env. Populated in initialize() from
         // SubViewport::get_texture()->get_rid(), which is safe to call in _ready().
@@ -43,6 +43,10 @@ namespace godot {
         // run and the SubViewport framebuffers are guaranteed to exist.
         // Never call texture_get_rd_texture in the hot loop — it syncs threads.
         std::vector<RID> d_source_rids;
+
+        // One uniform set per env: each binds that env's source texture (binding 0)
+        // plus the shared staging buffer (binding 1). Built once in _late_init().
+        std::vector<RID> d_uniform_sets;
 
         // Dimensions, set once in initialize():
         uint32_t d_num_envs   = 0;
@@ -91,8 +95,10 @@ namespace godot {
              *
              * Must not be called while a previous readback is still in flight
              * (i.e. after begin_readback but before wait).
+             *
+             * Returns false if GPU setup failed (caller should quit).
              */
-            void begin_readback(uint8_t *dst);
+            bool begin_readback(uint8_t *dst);
 
             /**
              * Blocks until the in-flight readback (if any) has completed and
@@ -103,9 +109,9 @@ namespace godot {
 
         private:
             // Completes GPU setup that requires framebuffers to exist: resolves
-            // d_rs_rids → d_source_rids and (Phase 3) builds the uniform set.
-            // Called once from begin_readback() on first use.
-            void _late_init();
+            // d_rs_rids → d_source_rids and builds the shader pipeline + uniform sets.
+            // Called once from begin_readback() on first use. Returns false on failure.
+            bool _late_init();
     };
 
 } // namespace godot
