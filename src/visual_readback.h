@@ -33,8 +33,15 @@ namespace godot {
         RID d_staging_buffer;
         RID d_uniform_set;
 
-        // One source RID per env, cached from SubViewport textures in initialize().
-        // Never touch texture_get_rd_texture in the hot loop — it syncs threads.
+        // RS-level texture RIDs, one per env. Populated in initialize() from
+        // SubViewport::get_texture()->get_rid(), which is safe to call in _ready().
+        // Kept alive so _late_init() can resolve them to RD-level RIDs later.
+        std::vector<RID> d_rs_rids;
+
+        // RD-level texture RIDs, one per env. Populated lazily in _late_init()
+        // on the first begin_readback() call, by which point force_draw() has
+        // run and the SubViewport framebuffers are guaranteed to exist.
+        // Never call texture_get_rd_texture in the hot loop — it syncs threads.
         std::vector<RID> d_source_rids;
 
         // Dimensions, set once in initialize():
@@ -60,9 +67,14 @@ namespace godot {
             VisualReadback &operator=(VisualReadback &&)      = delete;
 
             /**
-             * Builds the compute pipeline and staging buffer; caches source
-             * RIDs from the supplied SubViewports. Must be called once before
-             * begin_readback. Returns false on failure.
+             * Performs the portion of GPU setup that is safe to call from
+             * _ready(): gets the RenderingDevice, creates the staging buffer,
+             * and caches RS-level texture RIDs. Safe to call before any frame
+             * has been rendered. Returns false on failure.
+             *
+             * The remainder of setup (resolving RD-level texture RIDs, building
+             * the uniform set) is deferred to the first begin_readback() call
+             * via _late_init(), by which point force_draw() has run.
              *
              * @param viewports  One SubViewport per environment, in order.
              * @param res        Viewport resolution (width × height).
@@ -89,12 +101,11 @@ namespace godot {
              */
             void wait();
 
-            /**
-             * Rebuilds the source RID cache and recreates the uniform set
-             * after an env reset changes the SubViewport texture RIDs. Must
-             * not be called while a readback is in flight.
-             */
-            void rebuild_sources(const std::vector<SubViewport *> &viewports);
+        private:
+            // Completes GPU setup that requires framebuffers to exist: resolves
+            // d_rs_rids → d_source_rids and (Phase 3) builds the uniform set.
+            // Called once from begin_readback() on first use.
+            void _late_init();
     };
 
 } // namespace godot
