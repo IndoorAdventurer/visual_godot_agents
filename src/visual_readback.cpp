@@ -6,12 +6,90 @@
 #include <godot_cpp/classes/rd_uniform.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/callable_custom.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
 // Defined in copy_viewports_glsl.cpp.
 extern const char *k_copy_viewports_glsl;
 
 using namespace godot;
+
+// anonymous namespace for things we only need in this file:
+namespace {
+
+// Mirror of the push_constant block in copy_viewports_glsl.cpp.
+// std430 packs 4 × uint32_t contiguously — no hidden padding.
+struct PushConstants {
+    uint32_t env_index;
+    uint32_t width;
+    uint32_t height;
+    uint32_t out_channels;
+};
+static_assert(sizeof(PushConstants) == 16,
+              "PushConstants size changed — update the GLSL push_constant block to match.");
+
+/**
+ * One-shot callable handed to buffer_get_data_async each frame.
+ * Godot calls memdelete on the raw pointer once the Callable is destroyed, so
+ * this must be created with memnew.
+ */
+class ReadbackCallable : public CallableCustom {
+
+    std::mutex              *d_mutex;
+    std::condition_variable *d_cv;
+    bool                    *d_done;
+    uint8_t                 *d_dst;
+    uint32_t                 d_size;
+
+    static bool _eq(const CallableCustom *a, const CallableCustom *b) { return a == b; }
+    static bool _lt(const CallableCustom *a, const CallableCustom *b) { return a < b; }
+
+    public:
+        ReadbackCallable(std::mutex *m, std::condition_variable *cv,
+                         bool *done, uint8_t *dst, uint32_t size)
+            : d_mutex(m), d_cv(cv), d_done(done), d_dst(dst), d_size(size) {}
+
+        /**
+         * The default is_valid() checks ObjectDB with our null ObjectID and
+         * returns false, which could cause Godot to skip the call. Always report valid.
+         */
+        bool is_valid() const override { return true; }
+
+        uint32_t hash() const override {
+            return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(d_dst));
+        }
+        String get_as_text() const override { return "VisualReadback::ReadbackCallable"; }
+
+        CompareEqualFunc get_compare_equal_func() const override { return _eq; }
+        CompareLessFunc  get_compare_less_func()  const override { return _lt; }
+
+        ObjectID get_object() const override { return ObjectID(); }
+
+        /** Invoked on the render thread once the GPU readback completes. */
+        void call(const Variant **p_args, int p_argc,
+                  Variant & /*r_ret*/, GDExtensionCallError &r_err) const override {
+            if (p_argc < 1) {
+                r_err.error    = GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS;
+                r_err.expected = 1;
+                return;
+            }
+            PackedByteArray data = *p_args[0];
+            if (static_cast<uint32_t>(data.size()) != d_size) {
+                ERR_PRINT("VisualReadback: async callback received unexpected size — skipping memcpy.");
+            } else {
+                memcpy(d_dst, data.ptr(), d_size);
+            }
+            {
+                std::lock_guard<std::mutex> lock(*d_mutex);
+                *d_done = true;
+            }
+            d_cv->notify_one();
+        }
+};
+
+} // anonymous namespace
 
 VisualReadback::~VisualReadback() {
     // Drain any in-flight readback before releasing GPU resources, so the
@@ -50,8 +128,8 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
         d_rs_rids.push_back(vp->get_texture()->get_rid());
 
     // One storage buffer large enough for all env pixels.
-    uint32_t buf_size = d_num_envs * d_width * d_height * d_channels;
-    d_staging_buffer = d_rd->storage_buffer_create(buf_size);
+    d_buf_size = d_num_envs * d_width * d_height * d_channels;
+    d_staging_buffer = d_rd->storage_buffer_create(d_buf_size);
     if (!d_staging_buffer.is_valid()) {
         ERR_PRINT("VisualReadback: failed to create staging buffer.");
         return false;
@@ -151,32 +229,70 @@ bool VisualReadback::_late_init() {
     return true;
 }
 
-bool VisualReadback::begin_readback(uint8_t * /*dst*/) {
+bool VisualReadback::begin_readback(uint8_t *dst) {
     if (d_source_rids.empty()) {
         if (!_late_init())
             return false;
     }
 
-    // TODO PHASE 4: record compute list, dispatch, call buffer_get_data_async.
+    {
+        std::lock_guard<std::mutex> lock(d_mutex);
+        d_readback_done = false;
+    }
 
-    // =========================================================================
-    // TODO PERFORMANCE — MUST PROFILE BEFORE SHIPPING
-    //
-    // This loop dispatches once per environment. Each dispatch has GPU kernel
-    // launch overhead (~2–10 µs), so at 128 envs this adds ~250 µs–1.3 ms of
-    // pure overhead — larger than the PCIe readback itself (~170 µs at 84×84)
-    // and completely dwarfing the actual compute work (~20 µs). This defeats
-    // the purpose of batched GPU offloading.
-    //
-    // The fix is a single dispatch with Z = num_envs, binding all source
-    // textures as a descriptor array (sampler2D src_textures[]) and indexing
-    // with gl_GlobalInvocationID.z. This requires verifying that Godot's
-    // uniform_set_create accepts UNIFORM_TYPE_SAMPLER_WITH_TEXTURE with
-    // 1 sampler + N texture IDs — unknown until tested (see Phase 6).
-    //
-    // ACTION: after Phase 6 smoke test, profile dispatch overhead vs. readback
-    // time. If dispatch dominates, switch to the single-dispatch design above.
-    // =========================================================================
+    int64_t compute_list = d_rd->compute_list_begin();
+        d_rd->compute_list_bind_compute_pipeline(compute_list, d_pipeline);
+
+        // Loop-invariant fields are written once; only env_index changes per dispatch.
+        PackedByteArray pc_bytes;
+        pc_bytes.resize(sizeof(PushConstants));
+        PushConstants *pc = reinterpret_cast<PushConstants *>(pc_bytes.ptrw());
+        pc->width        = d_width;
+        pc->height       = d_height;
+        pc->out_channels = d_channels;
+
+        uint32_t groups_x = (d_width  + 7u) / 8u;
+        uint32_t groups_y = (d_height + 7u) / 8u;
+
+        // =========================================================================
+        // PERFORMANCE — MUST PROFILE BEFORE SHIPPING
+        //
+        // This loop dispatches once per environment. Each dispatch has GPU kernel
+        // launch overhead (~2–10 µs), so at 128 envs this adds ~250 µs–1.3 ms of
+        // pure overhead — larger than the PCIe readback itself (~170 µs at 84×84)
+        // and completely dwarfing the actual compute work (~20 µs). This defeats
+        // the purpose of batched GPU offloading.
+        //
+        // The fix is a single dispatch with Z = num_envs, binding all source
+        // textures as a descriptor array (sampler2D src_textures[]) and indexing
+        // with gl_GlobalInvocationID.z. This requires verifying that Godot's
+        // uniform_set_create accepts UNIFORM_TYPE_SAMPLER_WITH_TEXTURE with
+        // 1 sampler + N texture IDs — unknown until tested (see Phase 6).
+        //
+        // ACTION: after Phase 6 smoke test, profile dispatch overhead vs. readback
+        // time. If dispatch dominates, switch to the single-dispatch design above.
+        // =========================================================================
+        for (uint32_t i = 0; i < d_num_envs; ++i) {
+            pc->env_index = i;
+            d_rd->compute_list_bind_uniform_set(compute_list, d_uniform_sets[i], 0);
+            d_rd->compute_list_set_push_constant(compute_list, pc_bytes, sizeof(PushConstants));
+            d_rd->compute_list_dispatch(compute_list, groups_x, groups_y, 1);
+        }
+    d_rd->compute_list_end();
+
+    Error err = d_rd->buffer_get_data_async(
+        d_staging_buffer,
+        Callable(memnew(ReadbackCallable(&d_mutex, &d_cv, &d_readback_done, dst, d_buf_size))),
+        0, d_buf_size
+    );
+    if (err != OK) {
+        ERR_PRINT("VisualReadback: buffer_get_data_async failed with error " + itos(err));
+        // Unblock wait() so the caller doesn't hang.
+        std::lock_guard<std::mutex> lock(d_mutex);
+        d_readback_done = true;
+        d_cv.notify_one();
+        return false;
+    }
 
     return true;
 }

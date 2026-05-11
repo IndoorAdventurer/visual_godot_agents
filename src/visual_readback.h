@@ -53,12 +53,12 @@ namespace godot {
         uint32_t d_width      = 0;
         uint32_t d_height     = 0;
         uint32_t d_channels   = 0;  // output channels per pixel (1–4)
+        uint32_t d_buf_size   = 0;  // num_envs × width × height × channels
 
         // Callback → main-thread synchronization:
         std::mutex              d_mutex;
         std::condition_variable d_cv;
         bool                    d_readback_done = true;  // true = no readback in flight
-        uint8_t                *d_dst           = nullptr;
 
         public:
             VisualReadback()  = default;
