@@ -297,6 +297,9 @@ bool VisualReadback::begin_readback(uint8_t *dst) {
     return true;
 }
 
+// TODO: Right now we are calling wait directly after begin_readback. If we are
+// sure that stays the case, we can just use the non async version of buffer_get_data
+// and get rid of a huge amount of code bloat..
 void VisualReadback::wait() {
     std::unique_lock<std::mutex> lock(d_mutex);
     d_cv.wait(lock, [this] { return d_readback_done; });

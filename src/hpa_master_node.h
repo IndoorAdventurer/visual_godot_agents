@@ -37,8 +37,9 @@ namespace godot {
 
 			/**
 			 * Create the simulation environments. Gets called in _ready().
+			 * Returns the created SubViewports in env order.
 			 */
-			void _init_envs();
+			std::vector<SubViewport *> _init_envs();
 
 			/**
 			 * Walks subviewport children and returns the HPAAgentNode found in

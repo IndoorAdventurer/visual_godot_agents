@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/sub_viewport.hpp>
 #include <godot_cpp/classes/sprite2d.hpp> // TODO: remove. Just for test now.
 #include <godot_cpp/classes/viewport_texture.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
@@ -22,11 +23,10 @@ void HPAMasterNode::_ready() {
 	if (Engine::get_singleton()->is_editor_hint())
 		return;
 
-	_init_envs();
-
+	std::vector<SubViewport *> subviewports = _init_envs();
 	std::vector<HPAAgentNode *> agents = _collect_agents();
 
-	// 4 bytes per pixel (RGBA). This will come from the GPU readback format.
+	// 4 bytes per pixel (RGBA8).
 	size_t visual_obs_size = static_cast<size_t>(d_obs_res.x * d_obs_res.y) * 4;
 
 	if (!d_layout.initialize(static_cast<size_t>(d_num_envs), visual_obs_size, agents)) {
@@ -41,6 +41,16 @@ void HPAMasterNode::_ready() {
 		return;
 	}
 
+	if (!d_readback.initialize(subviewports, d_obs_res, 4)) {
+		ERR_PRINT("HPAMasterNode: VisualReadback initialization failed. Quitting.");
+		get_tree()->quit();
+		return;
+	}
+
+	// Flush the render thread so SubViewport framebuffers exist on the GPU
+	// before the first begin_readback call in _ipc_exchange.
+	RenderingServer::get_singleton()->force_draw(false);
+
 	d_initialized = true;
 }
 
@@ -52,6 +62,10 @@ void HPAMasterNode::_physics_process(double) {
 
 void HPAMasterNode::_ipc_exchange() {
 	d_ipc.write_and_signal([this](void *ptr, size_t) {
+		// Read the current GPU frame (rendered after last physics step) directly
+		// into the visual obs block in shared memory, then fill in the rest.
+		d_readback.begin_readback(d_layout.visual_obs_block_ptr(ptr));
+		d_readback.wait();
 		d_layout.write_env_state(ptr);
 	});
 	d_ipc.wait_and_read([this](const void *ptr, size_t) {
@@ -76,10 +90,12 @@ std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
 	return agents;
 }
 
-void HPAMasterNode::_init_envs() {
+std::vector<SubViewport *> HPAMasterNode::_init_envs() {
+	std::vector<SubViewport *> viewports;
 	if (d_env_scene.is_null())
-		return;
+		return viewports;
 
+	viewports.reserve(d_num_envs);
 	for (int idx = 0; idx != d_num_envs; ++idx) {
 		// Create subviewport:
 		SubViewport *subview = memnew(SubViewport);
@@ -103,7 +119,10 @@ void HPAMasterNode::_init_envs() {
 			0
 		));
 		add_child(sprite);
+
+		viewports.push_back(subview);
 	}
+	return viewports;
 }
 
 PackedStringArray HPAMasterNode::_get_configuration_warnings() const {
