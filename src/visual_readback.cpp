@@ -6,8 +6,6 @@
 #include <godot_cpp/classes/rd_uniform.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
-#include <godot_cpp/core/memory.hpp>
-#include <godot_cpp/variant/callable_custom.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
@@ -30,72 +28,9 @@ struct PushConstants {
 static_assert(sizeof(PushConstants) == 16,
               "PushConstants size changed — update the GLSL push_constant block to match.");
 
-/**
- * One-shot callable handed to buffer_get_data_async each frame.
- * Godot calls memdelete on the raw pointer once the Callable is destroyed, so
- * this must be created with memnew.
- */
-class ReadbackCallable : public CallableCustom {
-
-    std::mutex              *d_mutex;
-    std::condition_variable *d_cv;
-    bool                    *d_done;
-    uint8_t                 *d_dst;
-    uint32_t                 d_size;
-
-    static bool _eq(const CallableCustom *a, const CallableCustom *b) { return a == b; }
-    static bool _lt(const CallableCustom *a, const CallableCustom *b) { return a < b; }
-
-    public:
-        ReadbackCallable(std::mutex *m, std::condition_variable *cv,
-                         bool *done, uint8_t *dst, uint32_t size)
-            : d_mutex(m), d_cv(cv), d_done(done), d_dst(dst), d_size(size) {}
-
-        /**
-         * The default is_valid() checks ObjectDB with our null ObjectID and
-         * returns false, which could cause Godot to skip the call. Always report valid.
-         */
-        bool is_valid() const override { return true; }
-
-        uint32_t hash() const override {
-            return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(d_dst));
-        }
-        String get_as_text() const override { return "VisualReadback::ReadbackCallable"; }
-
-        CompareEqualFunc get_compare_equal_func() const override { return _eq; }
-        CompareLessFunc  get_compare_less_func()  const override { return _lt; }
-
-        ObjectID get_object() const override { return ObjectID(); }
-
-        /** Invoked on the render thread once the GPU readback completes. */
-        void call(const Variant **p_args, int p_argc,
-                  Variant & /*r_ret*/, GDExtensionCallError &r_err) const override {
-            if (p_argc < 1) {
-                r_err.error    = GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS;
-                r_err.expected = 1;
-                return;
-            }
-            PackedByteArray data = *p_args[0];
-            if (static_cast<uint32_t>(data.size()) != d_size) {
-                ERR_PRINT("VisualReadback: async callback received unexpected size — skipping memcpy.");
-            } else {
-                memcpy(d_dst, data.ptr(), d_size);
-            }
-            {
-                std::lock_guard<std::mutex> lock(*d_mutex);
-                *d_done = true;
-            }
-            d_cv->notify_one();
-        }
-};
-
 } // anonymous namespace
 
 VisualReadback::~VisualReadback() {
-    // Drain any in-flight readback before releasing GPU resources, so the
-    // async callback never fires into freed memory.
-    wait();
-
     if (d_rd == nullptr) return;
 
     // Free in reverse order of dependency: uniform sets → pipeline → shader → sampler → buffer.
@@ -171,13 +106,13 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
 bool VisualReadback::_late_init() {
     // Resolves RS-level RIDs → RD-level RIDs. Must run after at least one
     // force_draw() so the SubViewport framebuffers exist on the render thread.
-    // Called once from begin_readback() on first use.
+    // Called once from fetch_frame() on first use.
     RenderingServer *rs = RenderingServer::get_singleton();
     d_source_rids.reserve(d_num_envs);
     for (const RID &rs_rid : d_rs_rids) {
         RID rd_rid = rs->texture_get_rd_texture(rs_rid);
         if (!rd_rid.is_valid()) {
-            ERR_PRINT("VisualReadback: SubViewport has no RD texture — was force_draw() called before begin_readback()?");
+            ERR_PRINT("VisualReadback: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
             return false;
         }
         d_source_rids.push_back(rd_rid);
@@ -197,7 +132,7 @@ bool VisualReadback::_late_init() {
     // --- Per-env uniform sets ---
     // Each set binds one source texture (binding 0, sampler+texture) and the
     // shared staging buffer (binding 1, storage buffer). Splitting them per-env
-    // lets begin_readback() swap binding 0 between dispatches without touching
+    // lets fetch_frame() swap binding 0 between dispatches without touching
     // the buffer binding.
     d_uniform_sets.reserve(d_num_envs);
     for (uint32_t i = 0; i < d_num_envs; ++i) {
@@ -229,15 +164,10 @@ bool VisualReadback::_late_init() {
     return true;
 }
 
-bool VisualReadback::begin_readback(uint8_t *dst) {
+bool VisualReadback::fetch_frame(uint8_t *dst) {
     if (d_source_rids.empty()) {
         if (!_late_init())
             return false;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(d_mutex);
-        d_readback_done = false;
     }
 
     int64_t compute_list = d_rd->compute_list_begin();
@@ -280,28 +210,12 @@ bool VisualReadback::begin_readback(uint8_t *dst) {
         }
     d_rd->compute_list_end();
 
-    Error err = d_rd->buffer_get_data_async(
-        d_staging_buffer,
-        Callable(memnew(ReadbackCallable(&d_mutex, &d_cv, &d_readback_done, dst, d_buf_size))),
-        0, d_buf_size
-    );
-    if (err != OK) {
-        ERR_PRINT("VisualReadback: buffer_get_data_async failed with error " + itos(err));
-        // Unblock wait() so the caller doesn't hang.
-        std::lock_guard<std::mutex> lock(d_mutex);
-        d_readback_done = true;
-        d_cv.notify_one();
+    PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
+    if (static_cast<uint32_t>(data.size()) != d_buf_size) {
+        ERR_PRINT("VisualReadback: buffer_get_data returned unexpected size — skipping memcpy.");
         return false;
     }
+    memcpy(dst, data.ptr(), d_buf_size);
 
     return true;
 }
-
-// TODO: Right now we are calling wait directly after begin_readback. If we are
-// sure that stays the case, we can just use the non async version of buffer_get_data
-// and get rid of a huge amount of code bloat..
-void VisualReadback::wait() {
-    std::unique_lock<std::mutex> lock(d_mutex);
-    d_cv.wait(lock, [this] { return d_readback_done; });
-}
-

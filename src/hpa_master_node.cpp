@@ -26,10 +26,7 @@ void HPAMasterNode::_ready() {
 	std::vector<SubViewport *> subviewports = _init_envs();
 	std::vector<HPAAgentNode *> agents = _collect_agents();
 
-	// 4 bytes per pixel (RGBA8).
-	size_t visual_obs_size = static_cast<size_t>(d_obs_res.x * d_obs_res.y) * 4;
-
-	if (!d_layout.initialize(static_cast<size_t>(d_num_envs), visual_obs_size, agents)) {
+	if (!d_layout.initialize(static_cast<size_t>(d_num_envs), d_obs_res.x, d_obs_res.y, 4, agents)) {
 		ERR_PRINT("HPAMasterNode: layout initialization failed. Quitting.");
 		get_tree()->quit();
 		return;
@@ -48,7 +45,7 @@ void HPAMasterNode::_ready() {
 	}
 
 	// Flush the render thread so SubViewport framebuffers exist on the GPU
-	// before the first begin_readback call in _ipc_exchange.
+	// before the first fetch_frame call in _ipc_exchange.
 	RenderingServer::get_singleton()->force_draw(false);
 
 	d_initialized = true;
@@ -64,8 +61,7 @@ void HPAMasterNode::_ipc_exchange() {
 	d_ipc.write_and_signal([this](void *ptr, size_t) {
 		// Read the current GPU frame (rendered after last physics step) directly
 		// into the visual obs block in shared memory, then fill in the rest.
-		d_readback.begin_readback(d_layout.visual_obs_block_ptr(ptr));
-		d_readback.wait();
+		d_readback.fetch_frame(d_layout.visual_obs_block_ptr(ptr));
 		d_layout.write_env_state(ptr);
 	});
 	d_ipc.wait_and_read([this](const void *ptr, size_t) {

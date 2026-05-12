@@ -12,7 +12,7 @@ class EnvState:
     Arrays are updated in-place by Godot each step — copy explicitly if you
     need to retain values across a step() call.
     """
-    visual_obs: np.ndarray   # (N, visual_obs_size)  uint8
+    visual_obs: np.ndarray   # (N, H, W, C)  uint8
     scalar_obs: np.ndarray   # (N, scalar_obs_size)  uint8
     rewards:    np.ndarray   # (N,)                  float32
     dones:      np.ndarray   # (N,)                  uint8
@@ -21,10 +21,13 @@ class EnvState:
 class _Header(ctypes.Structure):
     """Mirrors SharedMemoryLayout::Header in shared_memory_layout.h."""
     _fields_ = [
-        ("num_envs",        ctypes.c_uint32),
-        ("visual_obs_size", ctypes.c_uint32),
-        ("scalar_obs_size", ctypes.c_uint32),
-        ("action_size",     ctypes.c_uint32),
+        ("num_envs",         ctypes.c_uint32),
+        ("visual_obs_size",  ctypes.c_uint32),
+        ("scalar_obs_size",  ctypes.c_uint32),
+        ("action_size",      ctypes.c_uint32),
+        ("visual_width",     ctypes.c_uint32),
+        ("visual_height",    ctypes.c_uint32),
+        ("visual_channels",  ctypes.c_uint32),
     ]
 
 _HEADER_SIZE = ctypes.sizeof(_Header)
@@ -76,6 +79,9 @@ class IPCClient:
         # Layout dimensions — populated by _init_layout() on connect():
         self.num_envs:        int = 0
         self.visual_obs_size: int = 0
+        self.visual_width:    int = 0
+        self.visual_height:   int = 0
+        self.visual_channels: int = 0
         self.scalar_obs_size: int = 0
         self.action_size:     int = 0
 
@@ -124,6 +130,9 @@ class IPCClient:
         header = _Header.from_buffer_copy(self._mem[:_HEADER_SIZE])
         self.num_envs        = header.num_envs
         self.visual_obs_size = header.visual_obs_size
+        self.visual_width    = header.visual_width
+        self.visual_height   = header.visual_height
+        self.visual_channels = header.visual_channels
         self.scalar_obs_size = header.scalar_obs_size
         self.action_size     = header.action_size
 
@@ -136,7 +145,7 @@ class IPCClient:
         view = lambda offset, dtype, shape: np.ndarray(shape=shape, dtype=dtype, buffer=self._mem, offset=offset)
 
         self._state = EnvState(
-            visual_obs=view(visual_obs_off, np.uint8,   (self.num_envs, self.visual_obs_size)),
+            visual_obs=view(visual_obs_off, np.uint8,   (self.num_envs, self.visual_height, self.visual_width, self.visual_channels)),
             scalar_obs=view(scalar_obs_off, np.uint8,   (self.num_envs, self.scalar_obs_size)),
             rewards=   view(rewards_off,    np.float32, (self.num_envs,)),
             dones=     view(done_flags_off, np.uint8,   (self.num_envs,)),

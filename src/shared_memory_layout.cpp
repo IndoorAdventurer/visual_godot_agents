@@ -11,12 +11,17 @@ SharedMemoryLayout::SharedMemoryLayout()
     d_visual_obs_size(0),
     d_scalar_obs_size(0),
     d_action_size(0),
+    d_visual_width(0),
+    d_visual_height(0),
+    d_visual_channels(0),
     d_agents()
 {}
 
 bool SharedMemoryLayout::initialize(
     size_t num_envs,
-    size_t visual_obs_size,
+    uint32_t visual_width,
+    uint32_t visual_height,
+    uint32_t visual_channels,
     const std::vector<HPAAgentNode *> &agents)
 {
     if (agents.empty()) {
@@ -35,7 +40,10 @@ bool SharedMemoryLayout::initialize(
     }
 
     d_num_envs        = num_envs;
-    d_visual_obs_size = visual_obs_size;
+    d_visual_width    = visual_width;
+    d_visual_height   = visual_height;
+    d_visual_channels = visual_channels;
+    d_visual_obs_size = static_cast<size_t>(visual_width) * visual_height * visual_channels;
     d_scalar_obs_size = scalar_obs_size;
     d_action_size     = action_size;
     d_agents          = agents;
@@ -65,6 +73,9 @@ void SharedMemoryLayout::write_env_state(void *shm) const {
     header->visual_obs_size = static_cast<uint32_t>(d_visual_obs_size);
     header->scalar_obs_size = static_cast<uint32_t>(d_scalar_obs_size);
     header->action_size     = static_cast<uint32_t>(d_action_size);
+    header->visual_width    = d_visual_width;
+    header->visual_height   = d_visual_height;
+    header->visual_channels = d_visual_channels;
 
     uint8_t *base = static_cast<uint8_t *>(shm);
 

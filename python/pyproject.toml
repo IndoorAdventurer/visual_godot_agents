@@ -11,5 +11,11 @@ dependencies = [
     "numpy",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "matplotlib",
+    "pyqt5",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["godot_hpa"]

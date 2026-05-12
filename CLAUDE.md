@@ -6,8 +6,7 @@ in Godot, communicates observations/actions to Python via POSIX shared memory an
 ## Build
 
 ```bash
-uv tool run scons platform=linux target=editor          # editor build
-uv tool run scons platform=linux target=template_debug  # debug build
+uv tool run scons [scons arguments...]
 ```
 
 All `.cpp` files in `src/` are compiled automatically. Generated files go to `src/gen/`.
