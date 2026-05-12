@@ -29,9 +29,9 @@ namespace godot {
         RID d_staging_buffer;
         RID d_sampler;
 
-        // RS-level texture RIDs, one per env. Populated in initialize() from
-        // SubViewport::get_texture()->get_rid(), which is safe to call in _ready().
-        // Kept alive so _late_init() can resolve them to RD-level RIDs later.
+        // SubViewport RIDs, one per env. Populated in initialize() via
+        // get_viewport_rid(), which is safe to call in _ready(). Used in
+        // _late_init() to call viewport_get_texture() → texture_get_rd_texture().
         std::vector<RID> d_rs_rids;
 
         // RD-level texture RIDs, one per env. Populated lazily in _late_init()
@@ -67,9 +67,10 @@ namespace godot {
              * and caches RS-level texture RIDs. Safe to call before any frame
              * has been rendered. Returns false on failure.
              *
-             * The remainder of setup (resolving RD-level texture RIDs, building
-             * the uniform set) is deferred to the first fetch_frame() call
-             * via _late_init(), by which point force_draw() has run.
+             * The remainder of setup (resolving viewport → texture → RD-level
+             * texture RIDs, building the uniform set) is deferred to the first
+             * fetch_frame() call via _late_init(), by which point force_draw()
+             * has run.
              *
              * @param viewports  One SubViewport per environment, in order.
              * @param res        Viewport resolution (width × height).

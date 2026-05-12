@@ -55,12 +55,14 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
         return false;
     }
 
-    // Cache RS-level texture RIDs. These are assigned synchronously when the
-    // SubViewport enters the scene tree, so this is safe to call from _ready().
-    // The RD-level RIDs are resolved later in _late_init().
+    // Cache each SubViewport's own RID so _late_init() can call
+    // viewport_get_texture() on it after force_draw() has run.
+    // get_texture()->get_rid() returns a ViewportTexture proxy RID that
+    // texture_get_rd_texture() cannot resolve per-viewport; the viewport RID is
+    // the correct handle to use.
     d_rs_rids.reserve(d_num_envs);
     for (SubViewport *vp : viewports)
-        d_rs_rids.push_back(vp->get_texture()->get_rid());
+        d_rs_rids.push_back(vp->get_viewport_rid());
 
     // One storage buffer large enough for all env pixels.
     d_buf_size = d_num_envs * d_width * d_height * d_channels;
@@ -109,8 +111,13 @@ bool VisualReadback::_late_init() {
     // Called once from fetch_frame() on first use.
     RenderingServer *rs = RenderingServer::get_singleton();
     d_source_rids.reserve(d_num_envs);
-    for (const RID &rs_rid : d_rs_rids) {
-        RID rd_rid = rs->texture_get_rd_texture(rs_rid);
+    for (const RID &viewport_rid : d_rs_rids) {
+        RID tex_rid = rs->viewport_get_texture(viewport_rid);
+        if (!tex_rid.is_valid()) {
+            ERR_PRINT("VisualReadback: viewport_get_texture returned invalid RID — is the SubViewport in the scene tree?");
+            return false;
+        }
+        RID rd_rid = rs->texture_get_rd_texture(tex_rid);
         if (!rd_rid.is_valid()) {
             ERR_PRINT("VisualReadback: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
             return false;
