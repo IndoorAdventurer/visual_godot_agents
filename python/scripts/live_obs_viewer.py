@@ -5,7 +5,7 @@ Opens a single matplotlib window showing all N environments side-by-side,
 updated in real time as Godot produces frames.
 
 Usage:
-    python scripts/visualize.py [name]
+    python scripts/live_obs_viewer.py [name]
 
 The name must match the one configured in the Godot HPAMasterNode (default: hpa).
 """

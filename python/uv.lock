@@ -147,19 +147,24 @@ name = "godot-hpa"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "matplotlib" },
     { name = "numpy" },
     { name = "posix-ipc" },
+]
+
+[package.optional-dependencies]
+viz = [
+    { name = "matplotlib" },
     { name = "pyqt5" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "matplotlib" },
+    { name = "matplotlib", marker = "extra == 'viz'" },
     { name = "numpy" },
     { name = "posix-ipc" },
-    { name = "pyqt5" },
+    { name = "pyqt5", marker = "extra == 'viz'" },
 ]
+provides-extras = ["viz"]
 
 [[package]]
 name = "kiwisolver"

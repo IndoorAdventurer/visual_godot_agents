@@ -3,11 +3,9 @@ Minimal test script: connects to a running Godot HPA environment, sends zero
 actions every step, and prints rewards and done flags.
 
 Usage:
-    python scripts/run.py [name]
+    python scripts/handshake_smoke_test.py [name]
 
 The name must match the one configured in the Godot HPAMasterNode (default: hpa).
-
-TODO: change the name to something other than run.py. I find that way too abstract
 """
 
 import sys
