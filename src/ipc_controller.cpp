@@ -65,15 +65,16 @@ bool IPCController::initialize(
 }
 
 void IPCController::exchange() {
-	d_posix.write_and_signal([this](void *ptr, size_t) {
-		// Read the current GPU frame (rendered after last physics step) directly
-		// into the visual obs block in shared memory, then fill in the rest.
-		d_vis.fetch_frame(visual_obs_block_ptr(ptr));
-		write_env_state(ptr);
-	});
-	d_posix.wait_and_read([this](const void *ptr, size_t) {
-		dispatch_actions(ptr);
-	});
+    // Read the current GPU frame (rendered after last physics step) directly
+    // into the visual obs block in shared memory, then fill in the rest:
+    d_vis.fetch_frame(visual_obs_block_ptr(d_posix.get_shm_ptr()));
+    write_env_state();
+
+    // Hand over control to Python:
+    d_posix.step();
+
+    // Handle actions returned by Python:
+    dispatch_actions();
 }
 
 void IPCController::set_agents(const std::vector<HPAAgentNode *> &agents) {
@@ -91,9 +92,9 @@ size_t IPCController::total_size() const {
         + d_num_envs * d_action_size;
 }
 
-void IPCController::write_env_state(void *shm) const {
+void IPCController::write_env_state() const {
     // Header — written every call so Python always has a valid layout description.
-    Header *header          = static_cast<Header *>(shm);
+    Header *header          = static_cast<Header *>(d_posix.get_shm_ptr());
     header->num_envs        = static_cast<uint32_t>(d_num_envs);
     header->visual_obs_size = static_cast<uint32_t>(d_visual_obs_size);
     header->scalar_obs_size = static_cast<uint32_t>(d_scalar_obs_size);
@@ -102,8 +103,10 @@ void IPCController::write_env_state(void *shm) const {
     header->visual_height   = d_visual_height;
     header->visual_channels = d_visual_channels;
 
-    uint8_t *base = static_cast<uint8_t *>(shm);
-
+    // TODO: why do we do this every time we call this? I feel like we can get
+    // rid of all those offset methods _*_offset() methods and just do this
+    // once on init in a for-loop.
+    uint8_t *base = static_cast<uint8_t *>(d_posix.get_shm_ptr());
     uint8_t *scalar_obs_base = base + _scalar_obs_offset();
     uint8_t *rewards_base    = base + _rewards_offset();
     uint8_t *done_flags_base = base + _done_flags_offset();
@@ -123,9 +126,9 @@ void IPCController::write_env_state(void *shm) const {
     }
 }
 
-void IPCController::dispatch_actions(const void *shm) const {
+void IPCController::dispatch_actions() const {
     const uint8_t *actions_base =
-        static_cast<const uint8_t *>(shm) + _actions_offset();
+        static_cast<const uint8_t *>(d_posix.get_shm_ptr()) + _actions_offset();
 
     for (size_t i = 0; i != d_num_envs; ++i) {
         PackedByteArray action;
@@ -133,30 +136,4 @@ void IPCController::dispatch_actions(const void *shm) const {
         std::memcpy(action.ptrw(), actions_base + i * d_action_size, d_action_size);
         d_agents[i]->apply_action(action);
     }
-}
-
-uint8_t *IPCController::visual_obs_block_ptr(void *shm) const {
-    return static_cast<uint8_t *>(shm) + _visual_obs_offset();
-}
-
-// --- Private offset helpers ---
-
-size_t IPCController::_visual_obs_offset() const {
-    return sizeof(Header);
-}
-
-size_t IPCController::_scalar_obs_offset() const {
-    return _visual_obs_offset() + d_num_envs * d_visual_obs_size;
-}
-
-size_t IPCController::_rewards_offset() const {
-    return _scalar_obs_offset() + d_num_envs * d_scalar_obs_size;
-}
-
-size_t IPCController::_done_flags_offset() const {
-    return _rewards_offset() + d_num_envs * sizeof(float);
-}
-
-size_t IPCController::_actions_offset() const {
-    return _done_flags_offset() + d_num_envs * sizeof(uint8_t);
 }

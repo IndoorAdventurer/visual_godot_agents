@@ -93,18 +93,14 @@ namespace godot {
              * Writes the header and all per-env outgoing data (scalar obs, reward,
              * done flag) into shared memory. The visual obs section is left untouched —
              * the GPU readback path writes there via visual_obs_block_ptr().
-             *
-             * Call this inside the write_and_signal() lambda, after fetch_frame().
              */
-            void write_env_state(void *shm) const;
+            void write_env_state() const;
 
             /**
              * Reads action bytes for each env from shared memory and calls
              * _apply_action() on the corresponding agent.
-             *
-             * Call this inside the IPCPosix::wait_and_read() lambda.
              */
-            void dispatch_actions(const void *shm) const;
+            void dispatch_actions() const;
 
             /**
              * Returns a pointer to the start of the contiguous visual obs block.
@@ -120,5 +116,31 @@ namespace godot {
             size_t _done_flags_offset() const;
             size_t _actions_offset() const;
     };
+
+    inline uint8_t *IPCController::visual_obs_block_ptr(void *shm) const {
+        return static_cast<uint8_t *>(shm) + _visual_obs_offset();
+    }
+
+    // --- Private offset helpers ---
+
+    inline size_t IPCController::_visual_obs_offset() const {
+        return sizeof(Header);
+    }
+
+    inline size_t IPCController::_scalar_obs_offset() const {
+        return _visual_obs_offset() + d_num_envs * d_visual_obs_size;
+    }
+
+    inline size_t IPCController::_rewards_offset() const {
+        return _scalar_obs_offset() + d_num_envs * d_scalar_obs_size;
+    }
+
+    inline size_t IPCController::_done_flags_offset() const {
+        return _rewards_offset() + d_num_envs * sizeof(float);
+    }
+
+    inline size_t IPCController::_actions_offset() const {
+        return _done_flags_offset() + d_num_envs * sizeof(uint8_t);
+    }
 
 } // namespace godot

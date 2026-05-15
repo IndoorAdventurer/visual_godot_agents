@@ -58,43 +58,13 @@ namespace godot
             void *get_shm_ptr() const;
 
             /**
-             * Calls write_fn with a pointer to the shared memory region and
-             * its size, then signals the env_ready semaphore to notify Python
-             * that new data is available.
-             *
-             * Use this to write outgoing data (e.g. observations) into shared
-             * memory. The write_fn MUST fully populate the relevant region
-             * before returning — the semaphore is signaled immediately after,
-             * so Python may start reading the moment this method returns.
-             *
-             * Typical usage:
-             *   ipc.write_and_signal([&](void *ptr, size_t size) {
-             *       layout.write_observations(ptr, observations);
-             *   });
+             * Hands over control to Python, then blocks till Python returns it.
              * 
-             * TODO: merge with wait_and_read and remove lambdas.
+             * IMPORTANT! Make sure the data in shared memory is updated before
+             * calling this method. After completion, Python will have written
+             * the latest actions to shared memory.
              */
-            void write_and_signal(std::function<void(void *, size_t)> write_fn);
-
-            /**
-             * Blocks until the act_ready semaphore is signaled by Python, then
-             * calls read_fn with a pointer to the shared memory region and its
-             * size.
-             *
-             * Use this to read incoming data (e.g. actions) from shared memory.
-             * The read_fn MUST finish reading before returning — the memory
-             * may be overwritten in the next step as soon as the next
-             * write_and_signal call is made.
-             *
-             * Typical usage:
-             *   ipc.wait_and_read([&](const void *ptr, size_t size) {
-             *       layout.read_actions(ptr, actions);
-             *   });
-             * 
-             * TODO: merge with write_and_signal and remove lambda. Can even
-             * be inlined imo.
-             */
-            void wait_and_read(std::function<void(const void *, size_t)> read_fn);
+            void step();
 
         private:
             /**
@@ -115,6 +85,5 @@ namespace godot
     inline void *IPCPosix::get_shm_ptr() const {
         return d_shm_ptr;
     }
-
 } // namespace godot
 
