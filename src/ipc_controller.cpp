@@ -18,11 +18,13 @@ IPCController::IPCController()
 {}
 
 bool IPCController::initialize(
+    const String &name,
     size_t num_envs,
-    uint32_t visual_width,
-    uint32_t visual_height,
+    Vector2i visual_res,
     uint32_t visual_channels,
-    const std::vector<HPAAgentNode *> &agents)
+    const std::vector<HPAAgentNode *> &agents,
+    const std::vector<SubViewport *> &viewports
+)
 {
     if (agents.empty()) {
         ERR_PRINT("IPCController: agents list is empty.");
@@ -40,15 +42,38 @@ bool IPCController::initialize(
     }
 
     d_num_envs        = num_envs;
-    d_visual_width    = visual_width;
-    d_visual_height   = visual_height;
+    d_visual_width    = visual_res.x;
+    d_visual_height   = visual_res.y;
     d_visual_channels = visual_channels;
-    d_visual_obs_size = static_cast<size_t>(visual_width) * visual_height * visual_channels;
+    d_visual_obs_size = static_cast<size_t>(visual_res.x) * visual_res.y * visual_channels;
     d_scalar_obs_size = scalar_obs_size;
     d_action_size     = action_size;
     d_agents          = agents;
 
+    if (!d_posix.initialize(name, total_size())) {
+        ERR_PRINT("IPCController: IPCPosix initialization failed. Quitting.");
+        return false;
+    }
+
+    if (!d_vis.initialize(viewports, visual_res, visual_channels)) {
+        ERR_PRINT("HPAMasterNode: IPCVisuals initialization failed. Quitting.");
+        return false;
+    }
+    
+    
     return true;
+}
+
+void IPCController::exchange() {
+	d_posix.write_and_signal([this](void *ptr, size_t) {
+		// Read the current GPU frame (rendered after last physics step) directly
+		// into the visual obs block in shared memory, then fill in the rest.
+		d_vis.fetch_frame(visual_obs_block_ptr(ptr));
+		write_env_state(ptr);
+	});
+	d_posix.wait_and_read([this](const void *ptr, size_t) {
+		dispatch_actions(ptr);
+	});
 }
 
 void IPCController::set_agents(const std::vector<HPAAgentNode *> &agents) {

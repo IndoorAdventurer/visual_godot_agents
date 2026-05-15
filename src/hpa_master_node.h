@@ -1,8 +1,6 @@
 #pragma once
 
-#include "ipc_posix.h"
 #include "ipc_controller.h"
-#include "ipc_visuals.h"
 #include "hpa_agent_node.h"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
@@ -18,13 +16,13 @@ namespace godot {
 		GDCLASS(HPAMasterNode, Node)
 
 		private:
+			// Configurables:
 			Ref<PackedScene> d_env_scene; // The scene representing the simulation
 			int d_num_envs;				  // Number of parallel environments
 			Vector2i d_obs_res;           // Resolution of observation space
 			String d_ipc_name;            // Shared name for SHM region and semaphores
-			IPCPosix d_ipc;           // IPC transport to Python
-			IPCController d_layout;  // Binary layout interpreter for shared memory
-			IPCVisuals d_readback;    // GPU readback pipeline
+			
+			IPCController d_ipc;		  // Responsible for all IPC with Python
 			bool d_initialized = false;   // Set only after _ready() succeeds fully
 
 		public:
@@ -46,12 +44,6 @@ namespace godot {
 			 * each environment scene. Called in _ready() after _init_envs().
 			 */
 			std::vector<HPAAgentNode *> _collect_agents();
-
-			/**
-			 * Writes observations into shared memory and signals Python, then
-			 * blocks until Python signals back with actions and reads them.
-			 */
-			void _ipc_exchange();
 
 			// Getters and setters:
 			void set_env_scene(const Ref<PackedScene> p_scene);

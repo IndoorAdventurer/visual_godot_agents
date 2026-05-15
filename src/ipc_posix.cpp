@@ -92,6 +92,16 @@ bool IPCPosix::initialize(const String &name, size_t shm_size) {
     return _init_shared_memory();
 }
 
+void IPCPosix::write_and_signal(std::function<void(void *, size_t)> write_fn) {
+    write_fn(d_shm_ptr, d_shm_size);
+    sem_post(d_env_ready);
+}
+
+void IPCPosix::wait_and_read(std::function<void(const void *, size_t)> read_fn) {
+    sem_wait(d_act_ready);
+    read_fn(d_shm_ptr, d_shm_size);
+}
+
 bool IPCPosix::_init_shared_memory() {
     // References:
     // https://man7.org/linux/man-pages/man7/shm_overview.7.html
@@ -127,14 +137,4 @@ bool IPCPosix::_init_shared_memory() {
 
     d_shm_ptr = ptr;
     return true;
-}
-
-void IPCPosix::write_and_signal(std::function<void(void *, size_t)> write_fn) {
-    write_fn(d_shm_ptr, d_shm_size);
-    sem_post(d_env_ready);
-}
-
-void IPCPosix::wait_and_read(std::function<void(const void *, size_t)> read_fn) {
-    sem_wait(d_act_ready);
-    read_fn(d_shm_ptr, d_shm_size);
 }

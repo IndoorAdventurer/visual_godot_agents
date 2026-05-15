@@ -64,7 +64,7 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
     for (SubViewport *vp : viewports)
         d_rs_rids.push_back(vp->get_viewport_rid());
 
-    // One storage buffer large enough for all env pixels.
+    // One storage buffer large enough for all env pixels:
     d_buf_size = d_num_envs * d_width * d_height * d_channels;
     d_staging_buffer = d_rd->storage_buffer_create(d_buf_size);
     if (!d_staging_buffer.is_valid()) {
@@ -72,8 +72,7 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
         return false;
     }
 
-    // Compile the shader and create the pipeline here so errors surface at
-    // startup rather than on the first frame. No framebuffer dependency.
+    // Compile the shader:
     Ref<RDShaderSource> src;
     src.instantiate();
     src->set_stage_source(RenderingDevice::SHADER_STAGE_COMPUTE,
@@ -96,6 +95,7 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
         return false;
     }
 
+    // Create pipeline:
     d_pipeline = d_rd->compute_pipeline_create(d_shader);
     if (!d_pipeline.is_valid()) {
         ERR_PRINT("IPCVisuals: compute_pipeline_create failed.");
@@ -178,6 +178,7 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
     }
 
     int64_t compute_list = d_rd->compute_list_begin();
+    {
         d_rd->compute_list_bind_compute_pipeline(compute_list, d_pipeline);
 
         // Loop-invariant fields are written once; only env_index changes per dispatch.
@@ -215,6 +216,7 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
             d_rd->compute_list_set_push_constant(compute_list, pc_bytes, sizeof(PushConstants));
             d_rd->compute_list_dispatch(compute_list, groups_x, groups_y, 1);
         }
+    }
     d_rd->compute_list_end();
 
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);

@@ -26,20 +26,9 @@ void HPAMasterNode::_ready() {
 	std::vector<SubViewport *> subviewports = _init_envs();
 	std::vector<HPAAgentNode *> agents = _collect_agents();
 
-	if (!d_layout.initialize(static_cast<size_t>(d_num_envs), d_obs_res.x, d_obs_res.y, 4, agents)) {
-		ERR_PRINT("HPAMasterNode: layout initialization failed. Quitting.");
-		get_tree()->quit();
-		return;
-	}
-
-	if (!d_ipc.initialize(d_ipc_name, d_layout.total_size())) {
-		ERR_PRINT("HPAMasterNode: IPC initialization failed. Quitting.");
-		get_tree()->quit();
-		return;
-	}
-
-	if (!d_readback.initialize(subviewports, d_obs_res, 4)) {
-		ERR_PRINT("HPAMasterNode: IPCVisuals initialization failed. Quitting.");
+	
+	if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
+		ERR_PRINT("HPAMasterNode: IPCController initialization failed. Quitting.");
 		get_tree()->quit();
 		return;
 	}
@@ -54,19 +43,7 @@ void HPAMasterNode::_ready() {
 void HPAMasterNode::_physics_process(double) {
 	if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
 		return;
-	_ipc_exchange();
-}
-
-void HPAMasterNode::_ipc_exchange() {
-	d_ipc.write_and_signal([this](void *ptr, size_t) {
-		// Read the current GPU frame (rendered after last physics step) directly
-		// into the visual obs block in shared memory, then fill in the rest.
-		d_readback.fetch_frame(d_layout.visual_obs_block_ptr(ptr));
-		d_layout.write_env_state(ptr);
-	});
-	d_ipc.wait_and_read([this](const void *ptr, size_t) {
-		d_layout.dispatch_actions(ptr);
-	});
+	d_ipc.exchange();
 }
 
 std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
@@ -216,6 +193,4 @@ void HPAMasterNode::_bind_methods() {
 	ADD_PROPERTY(
 		PropertyInfo(Variant::STRING, "ipc_name"),
 		"set_ipc_name", "get_ipc_name");
-
-	ClassDB::bind_method(D_METHOD("_ipc_exchange"), &HPAMasterNode::_ipc_exchange);
 }

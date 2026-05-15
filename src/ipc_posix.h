@@ -8,11 +8,14 @@
 namespace godot
 {
     /**
-     * Encapsulates POSIX Shared Memory and Semaphores for IPC with the Python
+     * Encapsulates POSIX Shared Memory and Semaphores for IPC with Python
      *
      * Python creates the semaphores, while the C++ side creates the shared
      * memory. This is because the Python process starts before Godot, while
      * Godot is the one that knows how large the shared memory must be.
+     * 
+     * See `ipc_client.py` for the corresponding implementation on Python's
+     * side.
      */
     class IPCPosix {
 
@@ -49,6 +52,12 @@ namespace godot
             bool initialize(const String &name, size_t shm_size);
 
             /**
+             * Get a pointer to shared memory. Needed because this class
+             * doesn't write to it itself.
+             */
+            void *get_shm_ptr() const;
+
+            /**
              * Calls write_fn with a pointer to the shared memory region and
              * its size, then signals the env_ready semaphore to notify Python
              * that new data is available.
@@ -62,6 +71,8 @@ namespace godot
              *   ipc.write_and_signal([&](void *ptr, size_t size) {
              *       layout.write_observations(ptr, observations);
              *   });
+             * 
+             * TODO: merge with wait_and_read and remove lambdas.
              */
             void write_and_signal(std::function<void(void *, size_t)> write_fn);
 
@@ -79,6 +90,9 @@ namespace godot
              *   ipc.wait_and_read([&](const void *ptr, size_t size) {
              *       layout.read_actions(ptr, actions);
              *   });
+             * 
+             * TODO: merge with write_and_signal and remove lambda. Can even
+             * be inlined imo.
              */
             void wait_and_read(std::function<void(const void *, size_t)> read_fn);
 
@@ -97,5 +111,10 @@ namespace godot
              */
             bool _init_shared_memory();
     };
+
+    inline void *IPCPosix::get_shm_ptr() const {
+        return d_shm_ptr;
+    }
+
 } // namespace godot
 

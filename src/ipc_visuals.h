@@ -14,10 +14,6 @@ namespace godot {
      * A compute shader copies all source textures into one device-local
      * staging buffer in a single dispatch, then buffer_get_data transfers
      * the whole block to CPU synchronously before returning.
-     *
-     * Typical call sequence per tick:
-     *   fetch_frame(dst)    // dispatch compute, read back, memcpy into dst
-     *   (signal Python)
      */
     class IPCVisuals {
 
