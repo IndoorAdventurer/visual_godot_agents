@@ -19,7 +19,7 @@ class EnvState:
 
 
 class _Header(ctypes.Structure):
-    """Mirrors SharedMemoryLayout::Header in shared_memory_layout.h."""
+    """Mirrors IPCController::Header in ipc_controller.h."""
     _fields_ = [
         ("num_envs",         ctypes.c_uint32),
         ("visual_obs_size",  ctypes.c_uint32),

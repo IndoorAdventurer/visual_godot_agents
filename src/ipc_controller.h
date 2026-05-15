@@ -55,7 +55,7 @@ namespace godot {
              * agents[0] — all agents must report identical sizes. Returns false if
              * agents is empty or any size query returns zero.
              *
-             * @param                   Name for POSIX IPC sems + shm
+             * @param name              Name for POSIX IPC sems + shm
              * @param num_envs          Number of parallel environments.
              * @param visual_res        The resolution of visual outputs
              * @param visual_channels   Output channels per pixel (1–4).
@@ -72,10 +72,11 @@ namespace godot {
             );
 
             /**
-             * Gathers data to send over to Python, theb blocks until Python
-             * signals back with actions and processes them.
+             * Gathers data to send over to Python, then blocks until Python
+             * signals back with actions and processes them. Returns false if
+             * the GPU readback failed; caller should treat this as fatal.
              */
-            void exchange();
+            bool exchange();
 
             /**
              * Replaces the stored agent pointers after an environment reset that
@@ -83,9 +84,10 @@ namespace godot {
              */
             void set_agents(const std::vector<HPAAgentNode *> &agents);
 
+        private:
             /**
              * Total bytes required for the shared memory region.
-             * Pass this to IPCPosix::initialize() as shm_size.
+             * Passed to IPCPosix::initialize() during initialize().
              */
             size_t total_size() const;
 
@@ -98,7 +100,7 @@ namespace godot {
 
             /**
              * Reads action bytes for each env from shared memory and calls
-             * _apply_action() on the corresponding agent.
+             * apply_action() on the corresponding agent.
              */
             void dispatch_actions() const;
 
@@ -109,7 +111,6 @@ namespace godot {
              */
             uint8_t *visual_obs_block_ptr(void *shm) const;
 
-        private:
             size_t _visual_obs_offset() const;
             size_t _scalar_obs_offset() const;
             size_t _rewards_offset() const;

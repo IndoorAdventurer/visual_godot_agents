@@ -56,7 +56,7 @@ bool IPCController::initialize(
     }
 
     if (!d_vis.initialize(viewports, visual_res, visual_channels)) {
-        ERR_PRINT("HPAMasterNode: IPCVisuals initialization failed. Quitting.");
+        ERR_PRINT("IPCController: IPCVisuals initialization failed. Quitting.");
         return false;
     }
     
@@ -64,10 +64,13 @@ bool IPCController::initialize(
     return true;
 }
 
-void IPCController::exchange() {
+bool IPCController::exchange() {
     // Read the current GPU frame (rendered after last physics step) directly
     // into the visual obs block in shared memory, then fill in the rest:
-    d_vis.fetch_frame(visual_obs_block_ptr(d_posix.get_shm_ptr()));
+    if (!d_vis.fetch_frame(visual_obs_block_ptr(d_posix.get_shm_ptr()))) {
+        ERR_PRINT("IPCController: GPU readback failed.");
+        return false;
+    }
     write_env_state();
 
     // Hand over control to Python:
@@ -75,6 +78,7 @@ void IPCController::exchange() {
 
     // Handle actions returned by Python:
     dispatch_actions();
+    return true;
 }
 
 void IPCController::set_agents(const std::vector<HPAAgentNode *> &agents) {

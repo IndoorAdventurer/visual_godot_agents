@@ -22,14 +22,15 @@ about the event loop as possible.
 **C++ (GDExtension)**
 - `HPAMasterNode` — root node; owns N SubViewports (one per simulated environment) and is
   responsible for the IPC exchanges with Python. IPC functionality is delegated to:
-  - `IPCInterface` — manages the low-level POSIX shared memory + semaphores
-  - `SharedMemoryLayout` — manages the data in shared memory: serialises env state and dispatches actions
+  - `IPCController` — orchestrates all IPC: owns `IPCPosix` and `IPCVisuals`, drives the
+    exchange loop, and manages shared memory layout
+    - `IPCPosix` — low-level POSIX shared memory + semaphores
+    - `IPCVisuals` — GPU readback pipeline (compute shader → staging buffer → shared memory)
 - `HPAAgentNode` — GDScript-overridable data gateway for an individual environment: collects observations,
   rewards and done flags; receives actions
 
 Visual observations are read back from each SubViewport's GPU texture and written directly
-into the shared memory visual block (`SharedMemoryLayout::visual_obs_block_ptr`). The
-readback mechanism is not yet decided.
+into the shared memory visual block by `IPCVisuals::fetch_frame()`.
 
 Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `src/register_types.cpp` and
 XML documentation in `doc_classes/`. Internal C++ components need neither.

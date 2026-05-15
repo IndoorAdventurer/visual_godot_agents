@@ -43,7 +43,10 @@ void HPAMasterNode::_ready() {
 void HPAMasterNode::_physics_process(double) {
 	if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
 		return;
-	d_ipc.exchange();
+	if (!d_ipc.exchange()) {
+		ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
+		get_tree()->quit();
+	}
 }
 
 std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
