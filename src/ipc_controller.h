@@ -35,20 +35,33 @@ namespace godot {
         // Constituent helper objects:
         IPCPosix d_posix;       // Responsible for POSIX IPC
         IPCVisuals d_vis;       // Responsible for visual readback from GPU
-        
+
         // Layout, etc:
-        size_t d_num_envs;
-        size_t d_visual_obs_size;
-        size_t d_scalar_obs_size;
-        size_t d_action_size;
-        uint32_t d_visual_width;
-        uint32_t d_visual_height;
-        uint32_t d_visual_channels;
+        size_t d_num_envs         = 0;
+        size_t d_visual_obs_size  = 0;
+        size_t d_scalar_obs_size  = 0;
+        size_t d_action_size      = 0;
+        uint32_t d_visual_width   = 0;
+        uint32_t d_visual_height  = 0;
+        uint32_t d_visual_channels = 0;
         std::vector<HPAAgentNode *> d_agents;
 
+        // Byte offsets into shared memory, fixed after initialize():
+        size_t d_visual_obs_offset  = 0;
+        size_t d_scalar_obs_offset  = 0;
+        size_t d_rewards_offset     = 0;
+        size_t d_done_flags_offset  = 0;
+        size_t d_actions_offset     = 0;
+
         public:
-            IPCController();
+            IPCController()  = default;
             ~IPCController() = default;
+
+            // Non-copyable, non-movable (owns OS and GPU resources via members):
+            IPCController(IPCController const &)            = delete;
+            IPCController &operator=(IPCController const &) = delete;
+            IPCController(IPCController &&)                 = delete;
+            IPCController &operator=(IPCController &&)      = delete;
 
             /**
              * Initializes the layout. Queries scalar_obs_size and action_size from
@@ -86,62 +99,17 @@ namespace godot {
 
         private:
             /**
-             * Total bytes required for the shared memory region.
-             * Passed to IPCPosix::initialize() during initialize().
-             */
-            size_t total_size() const;
-
-            /**
              * Writes the header and all per-env outgoing data (scalar obs, reward,
              * done flag) into shared memory. The visual obs section is left untouched —
-             * the GPU readback path writes there via visual_obs_block_ptr().
+             * the GPU readback path writes there directly via d_visual_obs_offset.
              */
-            void write_env_state() const;
+            void _write_env_state() const;
 
             /**
              * Reads action bytes for each env from shared memory and calls
              * apply_action() on the corresponding agent.
              */
-            void dispatch_actions() const;
-
-            /**
-             * Returns a pointer to the start of the contiguous visual obs block.
-             * The GPU readback path writes all N environments' pixel data here in
-             * one bulk transfer (env 0 first, then env 1, etc.).
-             */
-            uint8_t *visual_obs_block_ptr(void *shm) const;
-
-            size_t _visual_obs_offset() const;
-            size_t _scalar_obs_offset() const;
-            size_t _rewards_offset() const;
-            size_t _done_flags_offset() const;
-            size_t _actions_offset() const;
+            void _dispatch_actions() const;
     };
-
-    inline uint8_t *IPCController::visual_obs_block_ptr(void *shm) const {
-        return static_cast<uint8_t *>(shm) + _visual_obs_offset();
-    }
-
-    // --- Private offset helpers ---
-
-    inline size_t IPCController::_visual_obs_offset() const {
-        return sizeof(Header);
-    }
-
-    inline size_t IPCController::_scalar_obs_offset() const {
-        return _visual_obs_offset() + d_num_envs * d_visual_obs_size;
-    }
-
-    inline size_t IPCController::_rewards_offset() const {
-        return _scalar_obs_offset() + d_num_envs * d_scalar_obs_size;
-    }
-
-    inline size_t IPCController::_done_flags_offset() const {
-        return _rewards_offset() + d_num_envs * sizeof(float);
-    }
-
-    inline size_t IPCController::_actions_offset() const {
-        return _done_flags_offset() + d_num_envs * sizeof(uint8_t);
-    }
 
 } // namespace godot

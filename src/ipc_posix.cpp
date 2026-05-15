@@ -4,7 +4,6 @@
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
-#include <functional>
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -23,31 +22,6 @@ IPCPosix::IPCPosix()
 
 IPCPosix::~IPCPosix() {
     _clear_resources();
-}
-
-IPCPosix::IPCPosix(IPCPosix &&other) noexcept
-:
-    IPCPosix()
-{
-    *this = std::move(other);
-}
-
-IPCPosix &IPCPosix::operator=(IPCPosix &&other) noexcept {
-    if (this != &other) {
-        _clear_resources();
-
-        d_name = std::move(other.d_name);
-        d_env_ready = other.d_env_ready;
-        d_act_ready = other.d_act_ready;
-        d_shm_ptr   = other.d_shm_ptr;
-        d_shm_size  = other.d_shm_size;
-
-        other.d_env_ready = SEM_FAILED;
-        other.d_act_ready = SEM_FAILED;
-        other.d_shm_ptr   = nullptr;
-        other.d_shm_size  = 0;
-    }
-    return *this;
 }
 
 void IPCPosix::_clear_resources() {

@@ -1,7 +1,6 @@
 #pragma once
 #include <godot_cpp/variant/string.hpp>
 #include <cstddef>
-#include <functional>
 #include <semaphore.h>
 
 
@@ -29,13 +28,11 @@ namespace godot
             IPCPosix();
             ~IPCPosix();
 
-            // No copying:
-            IPCPosix(IPCPosix const &other) = delete;
-            IPCPosix &operator=(IPCPosix const &other) = delete;
-
-            // Move semantics:
-            IPCPosix(IPCPosix &&other) noexcept;
-            IPCPosix &operator=(IPCPosix &&other) noexcept;
+            // Non-copyable, non-movable (owns OS resources):
+            IPCPosix(IPCPosix const &)            = delete;
+            IPCPosix &operator=(IPCPosix const &) = delete;
+            IPCPosix(IPCPosix &&)                 = delete;
+            IPCPosix &operator=(IPCPosix &&)      = delete;
 
             /**
              * Opens the semaphores (created by Python) and creates and maps

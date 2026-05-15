@@ -5,18 +5,6 @@
 
 using namespace godot;
 
-IPCController::IPCController()
-:
-    d_num_envs(0),
-    d_visual_obs_size(0),
-    d_scalar_obs_size(0),
-    d_action_size(0),
-    d_visual_width(0),
-    d_visual_height(0),
-    d_visual_channels(0),
-    d_agents()
-{}
-
 bool IPCController::initialize(
     const String &name,
     size_t num_envs,
@@ -50,7 +38,14 @@ bool IPCController::initialize(
     d_action_size     = action_size;
     d_agents          = agents;
 
-    if (!d_posix.initialize(name, total_size())) {
+    d_visual_obs_offset  = sizeof(Header);
+    d_scalar_obs_offset  = d_visual_obs_offset  + num_envs * d_visual_obs_size;
+    d_rewards_offset     = d_scalar_obs_offset  + num_envs * d_scalar_obs_size;
+    d_done_flags_offset  = d_rewards_offset     + num_envs * sizeof(float);
+    d_actions_offset     = d_done_flags_offset  + num_envs * sizeof(uint8_t);
+    size_t total_size    = d_actions_offset      + num_envs * d_action_size;
+
+    if (!d_posix.initialize(name, total_size)) {
         ERR_PRINT("IPCController: IPCPosix initialization failed. Quitting.");
         return false;
     }
@@ -67,17 +62,18 @@ bool IPCController::initialize(
 bool IPCController::exchange() {
     // Read the current GPU frame (rendered after last physics step) directly
     // into the visual obs block in shared memory, then fill in the rest:
-    if (!d_vis.fetch_frame(visual_obs_block_ptr(d_posix.get_shm_ptr()))) {
+    uint8_t *shm = static_cast<uint8_t *>(d_posix.get_shm_ptr());
+    if (!d_vis.fetch_frame(shm + d_visual_obs_offset)) {
         ERR_PRINT("IPCController: GPU readback failed.");
         return false;
     }
-    write_env_state();
+    _write_env_state();
 
     // Hand over control to Python:
     d_posix.step();
 
     // Handle actions returned by Python:
-    dispatch_actions();
+    _dispatch_actions();
     return true;
 }
 
@@ -85,18 +81,7 @@ void IPCController::set_agents(const std::vector<HPAAgentNode *> &agents) {
     d_agents = agents;
 }
 
-size_t IPCController::total_size() const {
-    // Guess we don't need d_num_envs this many times and just use brackets,
-    // but this also looks nice :-p
-    return sizeof(Header)
-        + d_num_envs * d_visual_obs_size
-        + d_num_envs * d_scalar_obs_size
-        + d_num_envs * sizeof(float)    // rewards
-        + d_num_envs * sizeof(uint8_t)  // done flags
-        + d_num_envs * d_action_size;
-}
-
-void IPCController::write_env_state() const {
+void IPCController::_write_env_state() const {
     // Header — written every call so Python always has a valid layout description.
     Header *header          = static_cast<Header *>(d_posix.get_shm_ptr());
     header->num_envs        = static_cast<uint32_t>(d_num_envs);
@@ -107,13 +92,10 @@ void IPCController::write_env_state() const {
     header->visual_height   = d_visual_height;
     header->visual_channels = d_visual_channels;
 
-    // TODO: why do we do this every time we call this? I feel like we can get
-    // rid of all those offset methods _*_offset() methods and just do this
-    // once on init in a for-loop.
     uint8_t *base = static_cast<uint8_t *>(d_posix.get_shm_ptr());
-    uint8_t *scalar_obs_base = base + _scalar_obs_offset();
-    uint8_t *rewards_base    = base + _rewards_offset();
-    uint8_t *done_flags_base = base + _done_flags_offset();
+    uint8_t *scalar_obs_base = base + d_scalar_obs_offset;
+    uint8_t *rewards_base    = base + d_rewards_offset;
+    uint8_t *done_flags_base = base + d_done_flags_offset;
 
     for (size_t i = 0; i != d_num_envs; ++i) {
         HPAAgentNode *agent = d_agents[i];
@@ -130,9 +112,9 @@ void IPCController::write_env_state() const {
     }
 }
 
-void IPCController::dispatch_actions() const {
+void IPCController::_dispatch_actions() const {
     const uint8_t *actions_base =
-        static_cast<const uint8_t *>(d_posix.get_shm_ptr()) + _actions_offset();
+        static_cast<const uint8_t *>(d_posix.get_shm_ptr()) + d_actions_offset;
 
     for (size_t i = 0; i != d_num_envs; ++i) {
         PackedByteArray action;
