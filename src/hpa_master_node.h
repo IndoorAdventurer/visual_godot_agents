@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ipc_interface.h"
-#include "shared_memory_layout.h"
-#include "visual_readback.h"
+#include "ipc_posix.h"
+#include "ipc_controller.h"
+#include "ipc_visuals.h"
 #include "hpa_agent_node.h"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
@@ -22,9 +22,9 @@ namespace godot {
 			int d_num_envs;				  // Number of parallel environments
 			Vector2i d_obs_res;           // Resolution of observation space
 			String d_ipc_name;            // Shared name for SHM region and semaphores
-			IPCInterface d_ipc;           // IPC transport to Python
-			SharedMemoryLayout d_layout;  // Binary layout interpreter for shared memory
-			VisualReadback d_readback;    // GPU readback pipeline
+			IPCPosix d_ipc;           // IPC transport to Python
+			IPCController d_layout;  // Binary layout interpreter for shared memory
+			IPCVisuals d_readback;    // GPU readback pipeline
 			bool d_initialized = false;   // Set only after _ready() succeeds fully
 
 		public:

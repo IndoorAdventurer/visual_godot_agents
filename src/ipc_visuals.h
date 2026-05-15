@@ -19,7 +19,7 @@ namespace godot {
      *   fetch_frame(dst)    // dispatch compute, read back, memcpy into dst
      *   (signal Python)
      */
-    class VisualReadback {
+    class IPCVisuals {
 
         RenderingDevice *d_rd = nullptr;  // Non-owning pointer, valid for process lifetime
 
@@ -52,14 +52,14 @@ namespace godot {
         uint32_t d_buf_size   = 0;  // num_envs × width × height × channels
 
         public:
-            VisualReadback()  = default;
-            ~VisualReadback();
+            IPCVisuals()  = default;
+            ~IPCVisuals();
 
             // Non-copyable, non-movable (owns GPU resources):
-            VisualReadback(VisualReadback const &)            = delete;
-            VisualReadback &operator=(VisualReadback const &) = delete;
-            VisualReadback(VisualReadback &&)                 = delete;
-            VisualReadback &operator=(VisualReadback &&)      = delete;
+            IPCVisuals(IPCVisuals const &)            = delete;
+            IPCVisuals &operator=(IPCVisuals const &) = delete;
+            IPCVisuals(IPCVisuals &&)                 = delete;
+            IPCVisuals &operator=(IPCVisuals &&)      = delete;
 
             /**
              * Performs the portion of GPU setup that is safe to call from

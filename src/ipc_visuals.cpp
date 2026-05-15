@@ -1,4 +1,4 @@
-#include "visual_readback.h"
+#include "ipc_visuals.h"
 
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_source.hpp>
@@ -30,7 +30,7 @@ static_assert(sizeof(PushConstants) == 16,
 
 } // anonymous namespace
 
-VisualReadback::~VisualReadback() {
+IPCVisuals::~IPCVisuals() {
     if (d_rd == nullptr) return;
 
     // Free in reverse order of dependency: uniform sets → pipeline → shader → sampler → buffer.
@@ -42,7 +42,7 @@ VisualReadback::~VisualReadback() {
     if (d_staging_buffer.is_valid()) d_rd->free_rid(d_staging_buffer);
 }
 
-bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
+bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
                                 Vector2i res, uint32_t channels) {
     d_num_envs = static_cast<uint32_t>(viewports.size());
     d_width    = static_cast<uint32_t>(res.x);
@@ -51,7 +51,7 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
 
     d_rd = RenderingServer::get_singleton()->get_rendering_device();
     if (d_rd == nullptr) {
-        ERR_PRINT("VisualReadback: no RenderingDevice — is a Vulkan/Metal/D3D12 renderer active?");
+        ERR_PRINT("IPCVisuals: no RenderingDevice — is a Vulkan/Metal/D3D12 renderer active?");
         return false;
     }
 
@@ -68,7 +68,7 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
     d_buf_size = d_num_envs * d_width * d_height * d_channels;
     d_staging_buffer = d_rd->storage_buffer_create(d_buf_size);
     if (!d_staging_buffer.is_valid()) {
-        ERR_PRINT("VisualReadback: failed to create staging buffer.");
+        ERR_PRINT("IPCVisuals: failed to create staging buffer.");
         return false;
     }
 
@@ -81,31 +81,31 @@ bool VisualReadback::initialize(const std::vector<SubViewport *> &viewports,
 
     Ref<RDShaderSPIRV> spirv = d_rd->shader_compile_spirv_from_source(src);
     if (spirv.is_null()) {
-        ERR_PRINT("VisualReadback: shader SPIRV compilation failed.");
+        ERR_PRINT("IPCVisuals: shader SPIRV compilation failed.");
         return false;
     }
     String err = spirv->get_stage_compile_error(RenderingDevice::SHADER_STAGE_COMPUTE);
     if (!err.is_empty()) {
-        ERR_PRINT("VisualReadback: compute shader compile error: " + err);
+        ERR_PRINT("IPCVisuals: compute shader compile error: " + err);
         return false;
     }
 
     d_shader = d_rd->shader_create_from_spirv(spirv);
     if (!d_shader.is_valid()) {
-        ERR_PRINT("VisualReadback: shader_create_from_spirv failed.");
+        ERR_PRINT("IPCVisuals: shader_create_from_spirv failed.");
         return false;
     }
 
     d_pipeline = d_rd->compute_pipeline_create(d_shader);
     if (!d_pipeline.is_valid()) {
-        ERR_PRINT("VisualReadback: compute_pipeline_create failed.");
+        ERR_PRINT("IPCVisuals: compute_pipeline_create failed.");
         return false;
     }
 
     return true;
 }
 
-bool VisualReadback::_late_init() {
+bool IPCVisuals::_late_init() {
     // Resolves RS-level RIDs → RD-level RIDs. Must run after at least one
     // force_draw() so the SubViewport framebuffers exist on the render thread.
     // Called once from fetch_frame() on first use.
@@ -114,12 +114,12 @@ bool VisualReadback::_late_init() {
     for (const RID &viewport_rid : d_rs_rids) {
         RID tex_rid = rs->viewport_get_texture(viewport_rid);
         if (!tex_rid.is_valid()) {
-            ERR_PRINT("VisualReadback: viewport_get_texture returned invalid RID — is the SubViewport in the scene tree?");
+            ERR_PRINT("IPCVisuals: viewport_get_texture returned invalid RID — is the SubViewport in the scene tree?");
             return false;
         }
         RID rd_rid = rs->texture_get_rd_texture(tex_rid);
         if (!rd_rid.is_valid()) {
-            ERR_PRINT("VisualReadback: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
+            ERR_PRINT("IPCVisuals: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
             return false;
         }
         d_source_rids.push_back(rd_rid);
@@ -132,7 +132,7 @@ bool VisualReadback::_late_init() {
     // no fields need changing.
     d_sampler = d_rd->sampler_create(sampler_state);
     if (!d_sampler.is_valid()) {
-        ERR_PRINT("VisualReadback: sampler_create failed.");
+        ERR_PRINT("IPCVisuals: sampler_create failed.");
         return false;
     }
 
@@ -162,7 +162,7 @@ bool VisualReadback::_late_init() {
 
         RID us = d_rd->uniform_set_create(uniforms, d_shader, 0);
         if (!us.is_valid()) {
-            ERR_PRINT("VisualReadback: uniform_set_create failed for env " + itos(i));
+            ERR_PRINT("IPCVisuals: uniform_set_create failed for env " + itos(i));
             return false;
         }
         d_uniform_sets.push_back(us);
@@ -171,7 +171,7 @@ bool VisualReadback::_late_init() {
     return true;
 }
 
-bool VisualReadback::fetch_frame(uint8_t *dst) {
+bool IPCVisuals::fetch_frame(uint8_t *dst) {
     if (d_source_rids.empty()) {
         if (!_late_init())
             return false;
@@ -219,7 +219,7 @@ bool VisualReadback::fetch_frame(uint8_t *dst) {
 
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
     if (static_cast<uint32_t>(data.size()) != d_buf_size) {
-        ERR_PRINT("VisualReadback: buffer_get_data returned unexpected size — skipping memcpy.");
+        ERR_PRINT("IPCVisuals: buffer_get_data returned unexpected size — skipping memcpy.");
         return false;
     }
     memcpy(dst, data.ptr(), d_buf_size);

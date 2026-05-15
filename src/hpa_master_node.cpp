@@ -39,7 +39,7 @@ void HPAMasterNode::_ready() {
 	}
 
 	if (!d_readback.initialize(subviewports, d_obs_res, 4)) {
-		ERR_PRINT("HPAMasterNode: VisualReadback initialization failed. Quitting.");
+		ERR_PRINT("HPAMasterNode: IPCVisuals initialization failed. Quitting.");
 		get_tree()->quit();
 		return;
 	}

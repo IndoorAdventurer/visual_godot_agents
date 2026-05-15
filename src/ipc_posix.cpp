@@ -1,4 +1,4 @@
-#include "ipc_interface.h"
+#include "ipc_posix.h"
 
 #include <godot_cpp/core/error_macros.hpp>
 #include <cerrno>
@@ -12,7 +12,7 @@
 using namespace godot;
 
 
-IPCInterface::IPCInterface()
+IPCPosix::IPCPosix()
 :
     d_name(),
     d_env_ready(SEM_FAILED),
@@ -21,18 +21,18 @@ IPCInterface::IPCInterface()
     d_shm_size(0)
 {}
 
-IPCInterface::~IPCInterface() {
+IPCPosix::~IPCPosix() {
     _clear_resources();
 }
 
-IPCInterface::IPCInterface(IPCInterface &&other) noexcept
+IPCPosix::IPCPosix(IPCPosix &&other) noexcept
 :
-    IPCInterface()
+    IPCPosix()
 {
     *this = std::move(other);
 }
 
-IPCInterface &IPCInterface::operator=(IPCInterface &&other) noexcept {
+IPCPosix &IPCPosix::operator=(IPCPosix &&other) noexcept {
     if (this != &other) {
         _clear_resources();
 
@@ -50,7 +50,7 @@ IPCInterface &IPCInterface::operator=(IPCInterface &&other) noexcept {
     return *this;
 }
 
-void IPCInterface::_clear_resources() {
+void IPCPosix::_clear_resources() {
     if (d_shm_ptr != nullptr) {
         munmap(d_shm_ptr, d_shm_size);
         shm_unlink(("/" + d_name).utf8().get_data());
@@ -69,7 +69,7 @@ void IPCInterface::_clear_resources() {
     }
 }
 
-bool IPCInterface::initialize(const String &name, size_t shm_size) {
+bool IPCPosix::initialize(const String &name, size_t shm_size) {
     _clear_resources();
     d_name     = name;
     d_shm_size = shm_size;
@@ -92,7 +92,7 @@ bool IPCInterface::initialize(const String &name, size_t shm_size) {
     return _init_shared_memory();
 }
 
-bool IPCInterface::_init_shared_memory() {
+bool IPCPosix::_init_shared_memory() {
     // References:
     // https://man7.org/linux/man-pages/man7/shm_overview.7.html
     // https://www.geeksforgeeks.org/linux-unix/posix-shared-memory-api/
@@ -129,12 +129,12 @@ bool IPCInterface::_init_shared_memory() {
     return true;
 }
 
-void IPCInterface::write_and_signal(std::function<void(void *, size_t)> write_fn) {
+void IPCPosix::write_and_signal(std::function<void(void *, size_t)> write_fn) {
     write_fn(d_shm_ptr, d_shm_size);
     sem_post(d_env_ready);
 }
 
-void IPCInterface::wait_and_read(std::function<void(const void *, size_t)> read_fn) {
+void IPCPosix::wait_and_read(std::function<void(const void *, size_t)> read_fn) {
     sem_wait(d_act_ready);
     read_fn(d_shm_ptr, d_shm_size);
 }

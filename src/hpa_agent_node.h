@@ -15,7 +15,7 @@ namespace godot {
      * HPAMasterNode will locate it automatically.
      *
      * GDScript subclasses override the underscore-prefixed GDVIRTUAL methods.
-     * C++ callers (e.g. SharedMemoryLayout) use the unprefixed wrapper methods,
+     * C++ callers (e.g. IPCController) use the unprefixed wrapper methods,
      * which route through Godot's script dispatch so GDScript overrides are found.
      */
     class HPAAgentNode : public Node {
@@ -25,7 +25,7 @@ namespace godot {
             HPAAgentNode() = default;
             ~HPAAgentNode() = default;
 
-            // --- C++ API (used by SharedMemoryLayout) ---
+            // --- C++ API (used by IPCController) ---
             // These route through GDVIRTUAL_CALL so GDScript overrides are invoked.
 
             size_t get_scalar_obs_size();

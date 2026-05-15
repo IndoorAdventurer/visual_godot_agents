@@ -9,13 +9,12 @@ namespace godot
 {
     /**
      * Encapsulates POSIX Shared Memory and Semaphores for IPC with the Python
-     * TODO: reference corresponding Python file (receiving end).
      *
      * Python creates the semaphores, while the C++ side creates the shared
      * memory. This is because the Python process starts before Godot, while
      * Godot is the one that knows how large the shared memory must be.
      */
-    class IPCInterface {
+    class IPCPosix {
 
         String d_name;          // Name associated with specific instance
         sem_t *d_env_ready;     // Environment Ready Semaphore
@@ -24,16 +23,16 @@ namespace godot
         size_t d_shm_size;      // Size of shared memory region in bytes
 
         public:
-            IPCInterface();
-            ~IPCInterface();
+            IPCPosix();
+            ~IPCPosix();
 
             // No copying:
-            IPCInterface(IPCInterface const &other) = delete;
-            IPCInterface &operator=(IPCInterface const &other) = delete;
+            IPCPosix(IPCPosix const &other) = delete;
+            IPCPosix &operator=(IPCPosix const &other) = delete;
 
             // Move semantics:
-            IPCInterface(IPCInterface &&other) noexcept;
-            IPCInterface &operator=(IPCInterface &&other) noexcept;
+            IPCPosix(IPCPosix &&other) noexcept;
+            IPCPosix &operator=(IPCPosix &&other) noexcept;
 
             /**
              * Opens the semaphores (created by Python) and creates and maps

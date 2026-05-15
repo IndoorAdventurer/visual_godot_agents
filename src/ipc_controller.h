@@ -18,9 +18,9 @@ class HPAAgentNode;
  * The Header is written on every write_env_state() call so Python always has
  * an up-to-date description of the layout without out-of-band configuration.
  *
- * This class does not own the shared memory pointer — that is owned by IPCInterface.
+ * This class does not own the shared memory pointer — that is owned by IPCPosix.
  */
-class SharedMemoryLayout {
+class IPCController {
 
     /**
      * Written at the start of shared memory so Python can derive all offsets
@@ -46,8 +46,8 @@ class SharedMemoryLayout {
     std::vector<HPAAgentNode *> d_agents;
 
     public:
-        SharedMemoryLayout();
-        ~SharedMemoryLayout() = default;
+        IPCController();
+        ~IPCController() = default;
 
         /**
          * Initializes the layout. Queries scalar_obs_size and action_size from
@@ -71,7 +71,7 @@ class SharedMemoryLayout {
 
         /**
          * Total bytes required for the shared memory region.
-         * Pass this to IPCInterface::initialize() as shm_size.
+         * Pass this to IPCPosix::initialize() as shm_size.
          */
         size_t total_size() const;
 
@@ -88,7 +88,7 @@ class SharedMemoryLayout {
          * Reads action bytes for each env from shared memory and calls
          * _apply_action() on the corresponding agent.
          *
-         * Call this inside the IPCInterface::wait_and_read() lambda.
+         * Call this inside the IPCPosix::wait_and_read() lambda.
          */
         void dispatch_actions(const void *shm) const;
 
