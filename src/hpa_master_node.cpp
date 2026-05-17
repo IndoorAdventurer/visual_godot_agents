@@ -1,9 +1,9 @@
 #include "hpa_master_node.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
-#include <godot_cpp/classes/sprite2d.hpp> // TODO: remove. Just for test now.
-#include <godot_cpp/classes/viewport_texture.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/object.hpp>
@@ -21,14 +21,39 @@ HPAMasterNode::HPAMasterNode()
     d_initialized(false)
 {}
 
+void HPAMasterNode::_configure_sim_loop() {
+    Engine *engine = Engine::get_singleton();
+    // Physics step must be much smaller than one main-loop iteration so the
+    // accumulator fires on every iteration. time_scale keeps the reported delta at 1/step_rate_hz.
+    engine->set_physics_ticks_per_second(static_cast<int>(SIM_TIME_MULTIPLIER) * d_step_rate_hz);
+    // With time_scale this large, wall_delta * time_scale always exceeds one physics step,
+    // so the per-frame physics cap always bites and exactly one tick fires per iteration.
+    engine->set_time_scale(SIM_TIME_MULTIPLIER);
+    engine->set_max_physics_steps_per_frame(1);
+    engine->set_physics_jitter_fix(0.0);
+    engine->set_max_fps(0);
+
+    // Belt-and-braces: assert the default; a project setting could override it.
+    ERR_FAIL_COND_MSG(
+        OS::get_singleton()->is_in_low_processor_usage_mode(),
+        "HPAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
+        "iterations and break the sim-loop. Disable it in Project Settings.");
+
+    DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
+    get_tree()->set_physics_interpolation_enabled(false);
+    // Kill the automatic render loop; we drive rendering manually via force_draw().
+    RenderingServer::get_singleton()->set_render_loop_enabled(false);
+}
+
 void HPAMasterNode::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
 
+    _configure_sim_loop();
+
     std::vector<SubViewport *> subviewports = _init_envs();
     std::vector<HPAAgentNode *> agents = _collect_agents();
 
-    
     if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
         ERR_PRINT("HPAMasterNode: IPCController initialization failed. Quitting.");
         get_tree()->quit();
@@ -36,7 +61,9 @@ void HPAMasterNode::_ready() {
     }
 
     // Flush the render thread so SubViewport framebuffers exist on the GPU
-    // before the first fetch_frame call in _ipc_exchange.
+    // before the first fetch_frame call. This force_draw is load-bearing:
+    // render_loop_enabled is now false, so without it the first fetch_frame
+    // would read an uninitialised framebuffer.
     RenderingServer::get_singleton()->force_draw(false);
 
     d_initialized = true;
@@ -45,6 +72,8 @@ void HPAMasterNode::_ready() {
 void HPAMasterNode::_physics_process(double) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
+    // Render before exchange so fetch_frame() reads the post-physics frame, not a stale one.
+    RenderingServer::get_singleton()->force_draw(false);
     if (!d_ipc.exchange()) {
         ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
         get_tree()->quit();
@@ -85,18 +114,6 @@ std::vector<SubViewport *> HPAMasterNode::_init_envs() {
         Node *scene_inst = d_env_scene->instantiate();
         subview->add_child(scene_inst);
         add_child(subview);
-
-        // Create sprite to display the scene for now
-        // TODO: this is just for testing. Textures should get collected on
-        // the GPU and written to RAM in a single batch.
-        Sprite2D *sprite = memnew(Sprite2D);
-        sprite->set_texture(subview->get_texture());
-        sprite->set_centered(false);
-        sprite->set_position(Vector2(
-            idx * d_obs_res.x,
-            0
-        ));
-        add_child(sprite);
 
         viewports.push_back(subview);
     }

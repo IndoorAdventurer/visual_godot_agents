@@ -108,7 +108,9 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
 bool IPCVisuals::_late_init() {
     // Resolves RS-level RIDs → RD-level RIDs. Must run after at least one
     // force_draw() so the SubViewport framebuffers exist on the render thread.
-    // Called once from fetch_frame() on first use.
+    // HPAMasterNode::_ready() calls force_draw(false) explicitly for this purpose;
+    // with render_loop_enabled = false there is no automatic frame that would
+    // otherwise satisfy this requirement. Called once from fetch_frame() on first use.
     RenderingServer *rs = RenderingServer::get_singleton();
     d_source_rids.reserve(d_num_envs);
     for (const RID &viewport_rid : d_rs_rids) {

@@ -14,10 +14,16 @@ All `.cpp` files in `src/` are compiled automatically. Generated files go to `sr
 ## Architecture (current)
 
 **Simulation time is fully decoupled from real time.** Godot runs as fast as the CPU/GPU
-allows with a fixed time delta — there is no vsync, no wall-clock pacing, no
-assumption that one tick takes any particular amount of real time. How to implement
-that is still not decided, so for the time being we should make as little assumptions
-about the event loop as possible.
+allows with a fixed time delta — there is no vsync, no wall-clock pacing, no assumption
+that one tick takes any particular amount of real time. `HPAMasterNode::_ready()` applies
+the necessary engine settings (`physics_ticks_per_second`, `time_scale`, `max_fps`, etc.)
+and disables the automatic render loop; `_physics_process` drives rendering manually via
+`RenderingServer::force_draw()` before each IPC exchange.
+
+**Environment logic must use `_physics_process`** (or physics-mode equivalents such as
+physics-mode `Timer` nodes). `_process` receives a wall-clock delta scaled by `time_scale`
+which is not a meaningful simulation time — `AnimationPlayer`, `Tween`, and `Timer` nodes
+in default (idle) process mode will all expire immediately.
 
 **C++ (GDExtension)**
 - `HPAMasterNode` — root node; owns N SubViewports (one per simulated environment) and is

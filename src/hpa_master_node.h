@@ -16,6 +16,12 @@ namespace godot {
         GDCLASS(HPAMasterNode, Node)
 
         private:
+            // physics_ticks_per_second = SIM_TIME_MULTIPLIER * step_rate_hz, making the
+            // physics step ~17 ns — far smaller than any main-loop iteration. The accumulator
+            // therefore always fires on every iteration (one tick, capped by max_physics_steps_per_frame).
+            // time_scale = SIM_TIME_MULTIPLIER cancels out, so reported delta = 1/step_rate_hz.
+            static constexpr double SIM_TIME_MULTIPLIER = 1e6;
+
             // Configurables:
             Ref<PackedScene> d_env_scene; // The scene representing the simulation
             int d_num_envs;				  // Number of parallel environments
@@ -33,6 +39,12 @@ namespace godot {
             void _ready() override;
             void _physics_process(double p_delta) override;
             PackedStringArray _get_configuration_warnings() const override;
+
+            /**
+             * Apply all engine settings that decouple simulation time from wall-clock time.
+             * Must be called before d_initialized is set and before the first force_draw.
+             */
+            void _configure_sim_loop();
 
             /**
              * Create the simulation environments. Gets called in _ready().
