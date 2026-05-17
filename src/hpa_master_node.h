@@ -21,7 +21,8 @@ namespace godot {
             int d_num_envs;				  // Number of parallel environments
             Vector2i d_obs_res;           // Resolution of observation space
             String d_ipc_name;            // Shared name for SHM region and semaphores
-            
+            int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
+
             IPCController d_ipc;		  // Responsible for all IPC with Python
             bool d_initialized;  // Set only after _ready() succeeds fully
 
@@ -54,6 +55,8 @@ namespace godot {
             Vector2i get_obs_res() const;
             void set_ipc_name(const String &p_name);
             String get_ipc_name() const;
+            void set_step_rate_hz(int p_hz);
+            int get_step_rate_hz() const;
 
         protected:
             static void _bind_methods();

@@ -17,6 +17,7 @@ HPAMasterNode::HPAMasterNode()
     d_num_envs(2),
     d_obs_res(128, 128),
     d_ipc_name("hpa"),
+    d_step_rate_hz(60),
     d_initialized(false)
 {}
 
@@ -152,6 +153,14 @@ String HPAMasterNode::get_ipc_name() const {
     return d_ipc_name;
 }
 
+void HPAMasterNode::set_step_rate_hz(int p_hz) {
+    d_step_rate_hz = p_hz;
+}
+
+int HPAMasterNode::get_step_rate_hz() const {
+    return d_step_rate_hz;
+}
+
 void HPAMasterNode::_bind_methods() {
     // Environment scene property:
     ClassDB::bind_method(
@@ -197,4 +206,13 @@ void HPAMasterNode::_bind_methods() {
     ADD_PROPERTY(
         PropertyInfo(Variant::STRING, "ipc_name"),
         "set_ipc_name", "get_ipc_name");
+
+    // Step rate:
+    ClassDB::bind_method(
+        D_METHOD("set_step_rate_hz", "p_hz"), &HPAMasterNode::set_step_rate_hz);
+    ClassDB::bind_method(
+        D_METHOD("get_step_rate_hz"), &HPAMasterNode::get_step_rate_hz);
+    ADD_PROPERTY(
+        PropertyInfo(Variant::INT, "step_rate_hz", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"),
+        "set_step_rate_hz", "get_step_rate_hz");
 }
