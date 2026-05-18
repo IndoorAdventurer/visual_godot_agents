@@ -189,6 +189,8 @@ void HPAMasterNode::_configure_sim_loop() {
         "iterations and break the sim-loop. Disable it in Project Settings.");
 
     DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
+    // Shrink the main window to the minimum — output goes to SubViewports, not here.
+    DisplayServer::get_singleton()->window_set_size(Vector2i(1, 1));
     get_tree()->set_physics_interpolation_enabled(false);
     // Kill the automatic render loop; we drive rendering manually via force_draw().
     RenderingServer::get_singleton()->set_render_loop_enabled(false);
