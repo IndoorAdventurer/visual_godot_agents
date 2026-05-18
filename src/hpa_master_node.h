@@ -15,22 +15,20 @@ namespace godot {
     class HPAMasterNode : public Node {
         GDCLASS(HPAMasterNode, Node)
 
-        private:
-            // physics_ticks_per_second = SIM_TIME_MULTIPLIER * step_rate_hz, making the
-            // physics step ~17 ns — far smaller than any main-loop iteration. The accumulator
-            // therefore always fires on every iteration (one tick, capped by max_physics_steps_per_frame).
-            // time_scale = SIM_TIME_MULTIPLIER cancels out, so reported delta = 1/step_rate_hz.
-            static constexpr double SIM_TIME_MULTIPLIER = 1e6;
+        // physics_ticks_per_second = SIM_TIME_MULTIPLIER * step_rate_hz, making the
+        // physics step ~17 ns — far smaller than any main-loop iteration. The accumulator
+        // therefore always fires on every iteration (one tick, capped by max_physics_steps_per_frame).
+        // time_scale = SIM_TIME_MULTIPLIER cancels out, so reported delta = 1/step_rate_hz.
+        static constexpr double SIM_TIME_MULTIPLIER = 1e6;
 
-            // Configurables:
-            Ref<PackedScene> d_env_scene; // The scene representing the simulation
-            int d_num_envs;				  // Number of parallel environments
-            Vector2i d_obs_res;           // Resolution of observation space
-            String d_ipc_name;            // Shared name for SHM region and semaphores
-            int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
+        Ref<PackedScene> d_env_scene; // The scene representing the simulation
+        int d_num_envs;               // Number of parallel environments
+        Vector2i d_obs_res;           // Resolution of observation space
+        String d_ipc_name;            // Shared name for SHM region and semaphores
+        int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
 
-            IPCController d_ipc;		  // Responsible for all IPC with Python
-            bool d_initialized;  // Set only after _ready() succeeds fully
+        IPCController d_ipc;          // Responsible for all IPC with Python
+        bool d_initialized;           // Set only after _ready() succeeds fully
 
         public:
             HPAMasterNode();
@@ -40,6 +38,21 @@ namespace godot {
             void _physics_process(double p_delta) override;
             PackedStringArray _get_configuration_warnings() const override;
 
+            void set_env_scene(const Ref<PackedScene> p_scene);
+            Ref<PackedScene> get_env_scene() const;
+            void set_num_envs(int p_num);
+            int get_num_envs() const;
+            void set_obs_res(Vector2i p_res);
+            Vector2i get_obs_res() const;
+            void set_ipc_name(const String &p_name);
+            String get_ipc_name() const;
+            void set_step_rate_hz(int p_hz);
+            int get_step_rate_hz() const;
+
+        protected:
+            static void _bind_methods();
+
+        private:
             /**
              * Apply all engine settings that decouple simulation time from wall-clock time.
              * Must be called before d_initialized is set and before the first force_draw.
@@ -57,21 +70,6 @@ namespace godot {
              * each environment scene. Called in _ready() after _init_envs().
              */
             std::vector<HPAAgentNode *> _collect_agents();
-
-            // Getters and setters:
-            void set_env_scene(const Ref<PackedScene> p_scene);
-            Ref<PackedScene> get_env_scene() const;
-            void set_num_envs(int p_num);
-            int get_num_envs() const;
-            void set_obs_res(Vector2i p_res);
-            Vector2i get_obs_res() const;
-            void set_ipc_name(const String &p_name);
-            String get_ipc_name() const;
-            void set_step_rate_hz(int p_hz);
-            int get_step_rate_hz() const;
-
-        protected:
-            static void _bind_methods();
     };
 
 } // namespace godot

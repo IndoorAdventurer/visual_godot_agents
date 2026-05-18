@@ -21,30 +21,6 @@ HPAMasterNode::HPAMasterNode()
     d_initialized(false)
 {}
 
-void HPAMasterNode::_configure_sim_loop() {
-    Engine *engine = Engine::get_singleton();
-    // Physics step must be much smaller than one main-loop iteration so the
-    // accumulator fires on every iteration. time_scale keeps the reported delta at 1/step_rate_hz.
-    engine->set_physics_ticks_per_second(static_cast<int>(SIM_TIME_MULTIPLIER) * d_step_rate_hz);
-    // With time_scale this large, wall_delta * time_scale always exceeds one physics step,
-    // so the per-frame physics cap always bites and exactly one tick fires per iteration.
-    engine->set_time_scale(SIM_TIME_MULTIPLIER);
-    engine->set_max_physics_steps_per_frame(1);
-    engine->set_physics_jitter_fix(0.0);
-    engine->set_max_fps(0);
-
-    // Belt-and-braces: assert the default; a project setting could override it.
-    ERR_FAIL_COND_MSG(
-        OS::get_singleton()->is_in_low_processor_usage_mode(),
-        "HPAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
-        "iterations and break the sim-loop. Disable it in Project Settings.");
-
-    DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
-    get_tree()->set_physics_interpolation_enabled(false);
-    // Kill the automatic render loop; we drive rendering manually via force_draw().
-    RenderingServer::get_singleton()->set_render_loop_enabled(false);
-}
-
 void HPAMasterNode::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
@@ -80,59 +56,19 @@ void HPAMasterNode::_physics_process(double) {
     }
 }
 
-std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
-    std::vector<HPAAgentNode *> agents;
-    int child_count = get_child_count();
-    for (int i = 0; i != child_count; ++i) {
-        SubViewport *sv = Object::cast_to<SubViewport>(get_child(i));
-        if (!sv)
-            continue;
-        TypedArray<Node> found = sv->find_children("*", "HPAAgentNode", true, false);
-        if (found.is_empty()) {
-            ERR_PRINT("HPAMasterNode: no HPAAgentNode found in environment scene.");
-            continue;
-        }
-        agents.push_back(Object::cast_to<HPAAgentNode>(found[0]));
-    }
-    return agents;
-}
-
-std::vector<SubViewport *> HPAMasterNode::_init_envs() {
-    std::vector<SubViewport *> viewports;
-    if (d_env_scene.is_null())
-        return viewports;
-
-    viewports.reserve(d_num_envs);
-    for (int idx = 0; idx != d_num_envs; ++idx) {
-        // Create subviewport:
-        SubViewport *subview = memnew(SubViewport);
-        subview->set_size(d_obs_res);
-        subview->set_update_mode(SubViewport::UPDATE_ALWAYS);
-        subview->set_use_own_world_3d(true);
-
-        // Instantiate simulation scene:
-        Node *scene_inst = d_env_scene->instantiate();
-        subview->add_child(scene_inst);
-        add_child(subview);
-
-        viewports.push_back(subview);
-    }
-    return viewports;
-}
-
 PackedStringArray HPAMasterNode::_get_configuration_warnings() const {
     PackedStringArray warnings = Node::_get_configuration_warnings();
     if (d_env_scene.is_null())
         warnings.push_back(
             "An environment scene must be provided for the simulation to run.");
-    
+
     if (d_num_envs <= 0)
-            warnings.push_back("Number of environments must be at least 1.");
-    
+        warnings.push_back("Number of environments must be at least 1.");
+
     if (d_obs_res.x <= 0 or d_obs_res.y < 0)
         warnings.push_back("Observation space resolution must be positive.");
-    
-        return warnings;
+
+    return warnings;
 }
 
 void HPAMasterNode::set_env_scene(const Ref<PackedScene> p_scene) {
@@ -191,7 +127,7 @@ void HPAMasterNode::_bind_methods() {
             PROPERTY_HINT_RESOURCE_TYPE, "PackedScene"),
         "set_env_scene",
         "get_env_scene");
-    
+
     // Number of environments property:
     ClassDB::bind_method(
         D_METHOD("set_num_envs", "p_num"), &HPAMasterNode::set_num_envs);
@@ -204,7 +140,7 @@ void HPAMasterNode::_bind_methods() {
             PROPERTY_HINT_RANGE, "0,1024,1,or_greater"),
         "set_num_envs",
         "get_num_envs");
-    
+
     // Screen resolution:
     ClassDB::bind_method(
         D_METHOD("set_obs_res", "p_res"), &HPAMasterNode::set_obs_res);
@@ -232,4 +168,68 @@ void HPAMasterNode::_bind_methods() {
     ADD_PROPERTY(
         PropertyInfo(Variant::INT, "step_rate_hz", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"),
         "set_step_rate_hz", "get_step_rate_hz");
+}
+
+void HPAMasterNode::_configure_sim_loop() {
+    Engine *engine = Engine::get_singleton();
+    // Physics step must be much smaller than one main-loop iteration so the
+    // accumulator fires on every iteration. time_scale keeps the reported delta at 1/step_rate_hz.
+    engine->set_physics_ticks_per_second(static_cast<int>(SIM_TIME_MULTIPLIER) * d_step_rate_hz);
+    // With time_scale this large, wall_delta * time_scale always exceeds one physics step,
+    // so the per-frame physics cap always bites and exactly one tick fires per iteration.
+    engine->set_time_scale(SIM_TIME_MULTIPLIER);
+    engine->set_max_physics_steps_per_frame(1);
+    engine->set_physics_jitter_fix(0.0);
+    engine->set_max_fps(0);
+
+    // Belt-and-braces: assert the default; a project setting could override it.
+    ERR_FAIL_COND_MSG(
+        OS::get_singleton()->is_in_low_processor_usage_mode(),
+        "HPAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
+        "iterations and break the sim-loop. Disable it in Project Settings.");
+
+    DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
+    get_tree()->set_physics_interpolation_enabled(false);
+    // Kill the automatic render loop; we drive rendering manually via force_draw().
+    RenderingServer::get_singleton()->set_render_loop_enabled(false);
+}
+
+std::vector<SubViewport *> HPAMasterNode::_init_envs() {
+    std::vector<SubViewport *> viewports;
+    if (d_env_scene.is_null())
+        return viewports;
+
+    viewports.reserve(d_num_envs);
+    for (int idx = 0; idx != d_num_envs; ++idx) {
+        // Create subviewport:
+        SubViewport *subview = memnew(SubViewport);
+        subview->set_size(d_obs_res);
+        subview->set_update_mode(SubViewport::UPDATE_ALWAYS);
+        subview->set_use_own_world_3d(true);
+
+        // Instantiate simulation scene:
+        Node *scene_inst = d_env_scene->instantiate();
+        subview->add_child(scene_inst);
+        add_child(subview);
+
+        viewports.push_back(subview);
+    }
+    return viewports;
+}
+
+std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
+    std::vector<HPAAgentNode *> agents;
+    int child_count = get_child_count();
+    for (int i = 0; i != child_count; ++i) {
+        SubViewport *sv = Object::cast_to<SubViewport>(get_child(i));
+        if (!sv)
+            continue;
+        TypedArray<Node> found = sv->find_children("*", "HPAAgentNode", true, false);
+        if (found.is_empty()) {
+            ERR_PRINT("HPAMasterNode: no HPAAgentNode found in environment scene.");
+            continue;
+        }
+        agents.push_back(Object::cast_to<HPAAgentNode>(found[0]));
+    }
+    return agents;
 }
