@@ -25,6 +25,7 @@ void HPAMasterNode::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
 
+    _apply_cmdline_args();
     _configure_sim_loop();
 
     std::vector<SubViewport *> subviewports = _init_envs();
@@ -114,6 +115,10 @@ int HPAMasterNode::get_step_rate_hz() const {
     return d_step_rate_hz;
 }
 
+Dictionary HPAMasterNode::get_user_args() const {
+    return d_user_args;
+}
+
 void HPAMasterNode::_bind_methods() {
     // Environment scene property:
     ClassDB::bind_method(
@@ -160,6 +165,10 @@ void HPAMasterNode::_bind_methods() {
         PropertyInfo(Variant::STRING, "ipc_name"),
         "set_ipc_name", "get_ipc_name");
 
+    // User-defined cmdline args (everything after -- not consumed by HPAMasterNode):
+    ClassDB::bind_method(
+        D_METHOD("get_user_args"), &HPAMasterNode::get_user_args);
+
     // Step rate:
     ClassDB::bind_method(
         D_METHOD("set_step_rate_hz", "p_hz"), &HPAMasterNode::set_step_rate_hz);
@@ -168,6 +177,25 @@ void HPAMasterNode::_bind_methods() {
     ADD_PROPERTY(
         PropertyInfo(Variant::INT, "step_rate_hz", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"),
         "set_step_rate_hz", "get_step_rate_hz");
+}
+
+void HPAMasterNode::_apply_cmdline_args() {
+    PackedStringArray args = OS::get_singleton()->get_cmdline_user_args();
+    for (int i = 0; i < args.size(); ++i) {
+        const String &arg = args[i];
+        int eq = arg.find("=");
+        if (eq == -1)
+            continue;
+        String key = arg.substr(0, eq);
+        String val = arg.substr(eq + 1);
+
+        if      (key == "ipc_name")     d_ipc_name      = val;
+        else if (key == "num_envs")     d_num_envs      = val.to_int();
+        else if (key == "obs_width")    d_obs_res.x     = val.to_int();
+        else if (key == "obs_height")   d_obs_res.y     = val.to_int();
+        else if (key == "step_rate_hz") d_step_rate_hz  = val.to_int();
+        else                            d_user_args[key] = val;
+    }
 }
 
 void HPAMasterNode::_configure_sim_loop() {

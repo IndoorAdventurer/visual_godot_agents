@@ -8,6 +8,18 @@
 		On [method Node._ready], the node initializes the environments and the IPC transport, and quits the application if initialization fails. Each physics step, [method Node._physics_process] automatically writes observations into shared memory, signals Python, blocks until Python responds with actions, and dispatches those actions to each environment's [HPAAgentNode].
 		Your environment scene must contain exactly one [HPAAgentNode] subclass. The Python process must create the semaphores and open the shared memory region using the same [member ipc_name] before Godot starts.
 	</description>
+	<methods>
+		<method name="get_user_args" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [HPAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], and [code]step_rate_hz[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
+				[codeblock]
+				var args = $HPAMasterNode.get_user_args()
+				var scenario = args.get("scenario", "id")
+				[/codeblock]
+			</description>
+		</method>
+	</methods>
 	<members>
 		<member name="environment_scene" type="PackedScene" setter="set_env_scene" getter="get_env_scene">
 			The scene representing one environment instance. Must contain exactly one [HPAAgentNode] subclass. One instance is created per parallel environment.

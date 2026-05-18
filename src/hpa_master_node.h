@@ -4,6 +4,7 @@
 #include "hpa_agent_node.h"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <vector>
 
 namespace godot {
@@ -26,6 +27,7 @@ namespace godot {
         Vector2i d_obs_res;           // Resolution of observation space
         String d_ipc_name;            // Shared name for SHM region and semaphores
         int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
+        Dictionary d_user_args;       // Parsed cmdline args not consumed by HPAMasterNode; exposed to GDScript
 
         IPCController d_ipc;          // Responsible for all IPC with Python
         bool d_initialized;           // Set only after _ready() succeeds fully
@@ -48,11 +50,20 @@ namespace godot {
             String get_ipc_name() const;
             void set_step_rate_hz(int p_hz);
             int get_step_rate_hz() const;
+            Dictionary get_user_args() const;
 
         protected:
             static void _bind_methods();
 
         private:
+            /**
+             * Parse key=value pairs from OS::get_cmdline_user_args() and apply them to
+             * HPAMasterNode properties. Must be called before _configure_sim_loop() so
+             * overrides are in effect when the sim loop is set up. Unknown keys are
+             * stored in d_user_args and exposed to GDScript via get_user_args().
+             */
+            void _apply_cmdline_args();
+
             /**
              * Apply all engine settings that decouple simulation time from wall-clock time.
              * Must be called before d_initialized is set and before the first force_draw.

@@ -1,5 +1,6 @@
 import ctypes
 import mmap
+import subprocess
 import posix_ipc
 import numpy as np
 from dataclasses import dataclass
@@ -60,6 +61,7 @@ class IPCClient:
     def __init__(self, name: str):
         self._name = name
         self._closed = False
+        self._process: subprocess.Popen | None = None
 
         # Pre-unlink any semaphores left by a previous crash, then create fresh.
         for sem_name in [f"/{name}_env_ready", f"/{name}_act_ready"]:
@@ -87,6 +89,50 @@ class IPCClient:
 
         self._state:       EnvState | None    = None
         self._actions_buf: np.ndarray | None  = None
+
+    def launch_godot(
+        self,
+        godot_binary: str,
+        project_path: str | None = None,
+        num_envs: int | None = None,
+        obs_width: int | None = None,
+        obs_height: int | None = None,
+        step_rate_hz: int | None = None,
+        extra_args: dict[str, str] | None = None,
+    ) -> None:
+        """
+        Launch Godot as a subprocess and retain the handle for termination.
+
+        Pass project_path to launch via the Godot editor binary; omit it to run
+        a standalone exported executable directly. Either way, ipc_name is always
+        forwarded so Godot connects to this client's shared memory region.
+
+        HPAMasterNode property overrides (num_envs, obs_width, obs_height,
+        step_rate_hz) are only forwarded when not None — Godot falls back to
+        whatever is set in the scene inspector otherwise.
+
+        On headless systems (HPC/SLURM) the caller is responsible for providing
+        a valid DISPLAY, e.g. by running the whole job under `xvfb-run -a`.
+        """
+        cmd = [godot_binary]
+        if project_path is not None:
+            cmd += ["--path", project_path]
+
+        # ipc_name must always match this client's name.
+        passthrough: dict[str, str] = {"ipc_name": self._name}
+        if num_envs is not None:
+            passthrough["num_envs"] = str(num_envs)
+        if obs_width is not None:
+            passthrough["obs_width"] = str(obs_width)
+        if obs_height is not None:
+            passthrough["obs_height"] = str(obs_height)
+        if step_rate_hz is not None:
+            passthrough["step_rate_hz"] = str(step_rate_hz)
+        if extra_args:
+            passthrough.update(extra_args)
+
+        cmd += ["--"] + [f"{k}={v}" for k, v in passthrough.items()]
+        self._process = subprocess.Popen(cmd)
 
     def connect(self) -> EnvState:
         """
@@ -118,6 +164,13 @@ class IPCClient:
             self._mem = None
         self._env_ready.unlink()
         self._act_ready.unlink()
+        if self._process is not None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+            self._process = None
 
     def __enter__(self):
         return self
