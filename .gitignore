@@ -17,3 +17,6 @@ design/
 __pycache__/
 *.egg-info/
 .venv/
+
+# Results of experiments:
+python/**/*.jsonl

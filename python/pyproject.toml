@@ -12,9 +12,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-viz = [
+dev = [
     "matplotlib",
     "pyqt5",
+    "pandas"
 ]
 
 [tool.hatch.build.targets.wheel]

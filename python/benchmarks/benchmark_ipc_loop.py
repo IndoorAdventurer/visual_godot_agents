@@ -10,14 +10,14 @@ Also validates that visual observations are actually changing between steps
 to verify Godot resumes cleanly with no catch-up burst.
 
 Usage:
-    python scripts/benchmark.py [--name NAME] [--steps N] [--warmup N]
-                                [--stall-after N --stall-seconds S]
+    python benchmarks/benchmark_ipc_loop.py [--name NAME] [--steps N] [--warmup N]
+                                            [--stall-after N --stall-seconds S]
 
 Example — baseline before implementation:
-    python scripts/benchmark.py --steps 500
+    python benchmarks/benchmark_ipc_loop.py --steps 500
 
 Example — stall robustness test:
-    python scripts/benchmark.py --steps 200 --stall-after 50 --stall-seconds 5
+    python benchmarks/benchmark_ipc_loop.py --steps 200 --stall-after 50 --stall-seconds 5
 """
 
 import argparse
