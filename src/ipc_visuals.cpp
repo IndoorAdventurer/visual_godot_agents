@@ -195,22 +195,18 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         uint32_t groups_y = (d_height + 7u) / 8u;
 
         // =========================================================================
-        // PERFORMANCE — MUST PROFILE BEFORE SHIPPING
+        // PERFORMANCE — low priority
         //
-        // This loop dispatches once per environment. Each dispatch has GPU kernel
-        // launch overhead (~2–10 µs), so at 128 envs this adds ~250 µs–1.3 ms of
-        // pure overhead — larger than the PCIe readback itself (~170 µs at 84×84)
-        // and completely dwarfing the actual compute work (~20 µs). This defeats
-        // the purpose of batched GPU offloading.
+        // This loop dispatches once per environment. Benchmarking (RTX 3060 Laptop,
+        // nsys Vulkan trace) shows the compute shader fence wait is only ~190 µs at
+        // 32 envs — the GPU finishes almost instantly regardless of dispatch count.
+        // Per-dispatch kernel-launch overhead is NOT the scaling bottleneck.
         //
-        // The fix is a single dispatch with Z = num_envs, binding all source
-        // textures as a descriptor array (sampler2D src_textures[]) and indexing
-        // with gl_GlobalInvocationID.z. This requires verifying that Godot's
-        // uniform_set_create accepts UNIFORM_TYPE_SAMPLER_WITH_TEXTURE with
-        // 1 sampler + N texture IDs — unknown until tested (see Phase 6).
-        //
-        // ACTION: after Phase 6 smoke test, profile dispatch overhead vs. readback
-        // time. If dispatch dominates, switch to the single-dispatch design above.
+        // The dominant cost is the buffer_get_data call below, which allocates a
+        // PackedByteArray and does two full memcpys of the entire visual block
+        // (~2.5 ms at 32 envs, 128×128). Collapsing to a single dispatch (Z=num_envs)
+        // is still worthwhile to remove per-env overhead, but won't move the needle
+        // until the double-memcpy in buffer_get_data is addressed first.
         // =========================================================================
         for (uint32_t i = 0; i < d_num_envs; ++i) {
             pc->env_index = i;

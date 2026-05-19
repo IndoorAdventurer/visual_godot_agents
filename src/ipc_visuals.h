@@ -5,15 +5,19 @@
 #include <cstdint>
 #include <vector>
 
+#ifdef HPA_PROFILE
+#include "hpa_profile.h"
+#endif
+
 namespace godot {
 
     /**
      * Owns the GPU pipeline that copies all N SubViewport textures into a
      * single contiguous byte buffer in shared memory.
      *
-     * A compute shader copies all source textures into one device-local
-     * staging buffer in a single dispatch, then buffer_get_data transfers
-     * the whole block to CPU synchronously before returning.
+     * A compute shader copies each SubViewport's texture into a shared
+     * device-local staging buffer (one dispatch per env), then buffer_get_data
+     * transfers the whole block to CPU synchronously before returning.
      */
     class IPCVisuals {
 

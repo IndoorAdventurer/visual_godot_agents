@@ -20,3 +20,5 @@ __pycache__/
 
 # Results of experiments:
 python/**/*.jsonl
+python/**/*.qdstrm
+python/**/*.nsys-rep
