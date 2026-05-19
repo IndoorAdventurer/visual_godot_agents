@@ -11,6 +11,11 @@ env = SConscript("godot-cpp/SConstruct")
 # Configures the 'src' directory as a source for header files.
 env.Append(CPPPATH=["src/"])
 
+# Forward any comma-separated preprocessor defines passed on the command line,
+# e.g.: scons CPPDEFINES=HPA_PROFILE  or  scons CPPDEFINES=FOO,BAR
+if "CPPDEFINES" in ARGUMENTS:
+    env.Append(CPPDEFINES=ARGUMENTS["CPPDEFINES"].split(","))
+
 # Collects all .cpp files in the 'src' folder as compile targets.
 sources = Glob("src/*.cpp")
 

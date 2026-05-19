@@ -12,6 +12,10 @@
 // Defined in copy_viewports_glsl.cpp.
 extern const char *k_copy_viewports_glsl;
 
+#ifdef HPA_PROFILE
+#include <chrono>
+#endif
+
 using namespace godot;
 
 // anonymous namespace for things we only need in this file:
@@ -195,22 +199,18 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         uint32_t groups_y = (d_height + 7u) / 8u;
 
         // =========================================================================
-        // PERFORMANCE — MUST PROFILE BEFORE SHIPPING
+        // PERFORMANCE — optimisation pending
         //
-        // This loop dispatches once per environment. Each dispatch has GPU kernel
-        // launch overhead (~2–10 µs), so at 128 envs this adds ~250 µs–1.3 ms of
-        // pure overhead — larger than the PCIe readback itself (~170 µs at 84×84)
-        // and completely dwarfing the actual compute work (~20 µs). This defeats
-        // the purpose of batched GPU offloading.
+        // This loop dispatches once per environment. Profiling (RTX 3060 Laptop,
+        // 84×84 obs) shows buffer_get_data blocks until all dispatches complete,
+        // so serial kernel-launch overhead is included in readback_cpu_us:
+        //   1 env → ~156 µs   4 → ~361 µs   8 → ~876 µs   32 → ~3154 µs
+        // The super-linear scaling strongly suggests per-dispatch launch overhead
+        // (~2–10 µs each) is a significant contributor at higher env counts.
         //
-        // The fix is a single dispatch with Z = num_envs, binding all source
-        // textures as a descriptor array (sampler2D src_textures[]) and indexing
-        // with gl_GlobalInvocationID.z. This requires verifying that Godot's
-        // uniform_set_create accepts UNIFORM_TYPE_SAMPLER_WITH_TEXTURE with
-        // 1 sampler + N texture IDs — unknown until tested (see Phase 6).
-        //
-        // ACTION: after Phase 6 smoke test, profile dispatch overhead vs. readback
-        // time. If dispatch dominates, switch to the single-dispatch design above.
+        // Next step: collapse to a single dispatch with Z = num_envs, binding all
+        // source textures as a descriptor array (sampler2D src_textures[]) indexed
+        // by gl_GlobalInvocationID.z, and re-benchmark to verify the win.
         // =========================================================================
         for (uint32_t i = 0; i < d_num_envs; ++i) {
             pc->env_index = i;
@@ -221,7 +221,21 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
     }
     d_rd->compute_list_end();
 
+#ifdef HPA_PROFILE
+    auto t_readback_start = std::chrono::steady_clock::now();
+#endif
+
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
+
+#ifdef HPA_PROFILE
+    {
+        auto t_readback_end = std::chrono::steady_clock::now();
+        uint64_t us = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(t_readback_end - t_readback_start).count());
+        d_stat_readback.record_print("readback_cpu_us", us, (int)d_num_envs);
+    }
+#endif
+
     if (static_cast<uint32_t>(data.size()) != d_buf_size) {
         ERR_PRINT("IPCVisuals: buffer_get_data returned unexpected size — skipping memcpy.");
         return false;

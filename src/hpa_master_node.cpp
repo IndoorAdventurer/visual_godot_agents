@@ -11,6 +11,10 @@
 
 using namespace godot;
 
+#ifdef HPA_PROFILE
+#include <chrono>
+#endif
+
 HPAMasterNode::HPAMasterNode()
 :
     d_env_scene(),
@@ -50,7 +54,18 @@ void HPAMasterNode::_physics_process(double) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
     // Render before exchange so fetch_frame() reads the post-physics frame, not a stale one.
+#ifdef HPA_PROFILE
+    auto t_fd_start = std::chrono::steady_clock::now();
+#endif
     RenderingServer::get_singleton()->force_draw(false);
+#ifdef HPA_PROFILE
+    {
+        auto t_fd_end = std::chrono::steady_clock::now();
+        uint64_t us = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(t_fd_end - t_fd_start).count());
+        d_stat_force_draw.record_print("force_draw_cpu_us", us, d_num_envs);
+    }
+#endif
     if (!d_ipc.exchange()) {
         ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
         get_tree()->quit();

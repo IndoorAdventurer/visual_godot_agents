@@ -7,6 +7,10 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <vector>
 
+#ifdef HPA_PROFILE
+#include "hpa_profile.h"
+#endif
+
 namespace godot {
 
     /**
@@ -31,6 +35,10 @@ namespace godot {
 
         IPCController d_ipc;          // Responsible for all IPC with Python
         bool d_initialized;           // Set only after _ready() succeeds fully
+
+#ifdef HPA_PROFILE
+        ProfileStats d_stat_force_draw;
+#endif
 
         public:
             HPAMasterNode();
