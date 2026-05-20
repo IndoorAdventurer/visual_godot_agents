@@ -47,14 +47,18 @@ void HPAMasterNode::_ready() {
     d_initialized = true;
 }
 
-void HPAMasterNode::_physics_process(double) {
+void HPAMasterNode::_physics_process(double p_delta) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
     HPA_PROFILE_RANGE("HPAMasterNode::_physics_process");
 
     // Render before exchange so fetch_frame() reads the post-physics frame, not a stale one.
+    // Pass delta as frame_step so shader TIME advances at the correct simulation rate.
+    // By the way: for some reason force_draw stalls this thread till the rendering
+    // thread is done, while the actual GPU doesn't finish till much later..
+    // Don't know why we can't just return immediately.
     HPA_PROFILE_PUSH("force_draw");
-    RenderingServer::get_singleton()->force_draw(false);
+    RenderingServer::get_singleton()->force_draw(false, p_delta);
     HPA_PROFILE_POP();
 
     HPA_PROFILE_PUSH("exchange");
