@@ -199,11 +199,8 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         // NOTE: there does not seem to be any real overhead for doing this in
         // multiple dispatches instead of 1. I profiled the code and also did a
         // test where I used a single dummy compute shader that would just copy
-        // over the first texture N times and that showed now speed increase
+        // over the first texture N times and that showed no speed increase
         // at all.
-
-        // Do note that of the 6 or 7 ms per frame I saw, some 3.5 ms were spent
-        // in buffer_get_data, so the main bottleneck still is somewhere here.
 
         for (uint32_t i = 0; i < d_num_envs; ++i) {
             pc->env_index = i;
@@ -215,6 +212,8 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
     d_rd->compute_list_end();
     HPA_PROFILE_POP();
 
+    // Profiling at 32 envs × 128×128 (see tag profiling/gpu-readback-2026-05-20):
+    // GPU render fence wait ~3.4 ms, compute ~140 µs, this DMA transfer ~500 µs.
     HPA_PROFILE_PUSH("buffer_get_data");
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
     HPA_PROFILE_POP();
