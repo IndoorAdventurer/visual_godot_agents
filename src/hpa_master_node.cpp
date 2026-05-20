@@ -50,19 +50,19 @@ void HPAMasterNode::_ready() {
 void HPAMasterNode::_physics_process(double) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
-    HPA_RANGE("HPAMasterNode::_physics_process");
+    HPA_PROFILE_RANGE("HPAMasterNode::_physics_process");
 
     // Render before exchange so fetch_frame() reads the post-physics frame, not a stale one.
-    HPA_PUSH("force_draw");
+    HPA_PROFILE_PUSH("force_draw");
     RenderingServer::get_singleton()->force_draw(false);
-    HPA_POP();
+    HPA_PROFILE_POP();
 
-    HPA_PUSH("exchange");
+    HPA_PROFILE_PUSH("exchange");
     if (!d_ipc.exchange()) {
         ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
         get_tree()->quit();
     }
-    HPA_POP();
+    HPA_PROFILE_POP();
 }
 
 PackedStringArray HPAMasterNode::_get_configuration_warnings() const {

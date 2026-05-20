@@ -180,7 +180,7 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
             return false;
     }
 
-    HPA_PUSH("compute_dispatch");
+    HPA_PROFILE_PUSH("compute_dispatch");
     int64_t compute_list = d_rd->compute_list_begin();
     {
         d_rd->compute_list_bind_compute_pipeline(compute_list, d_pipeline);
@@ -196,8 +196,14 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         uint32_t groups_x = (d_width  + 7u) / 8u;
         uint32_t groups_y = (d_height + 7u) / 8u;
 
-        // TODO: figure out if N dispatches has substantial overhead and if so
-        // maybe do something about it.
+        // NOTE: there does not seem to be any real overhead for doing this in
+        // multiple dispatches instead of 1. I profiled the code and also did a
+        // test where I used a single dummy compute shader that would just copy
+        // over the first texture N times and that showed now speed increase
+        // at all.
+
+        // Do note that of the 6 or 7 ms per frame I saw, some 3.5 ms were spent
+        // in buffer_get_data, so the main bottleneck still is somewhere here.
 
         for (uint32_t i = 0; i < d_num_envs; ++i) {
             pc->env_index = i;
@@ -207,19 +213,19 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         }
     }
     d_rd->compute_list_end();
-    HPA_POP();
+    HPA_PROFILE_POP();
 
-    HPA_PUSH("buffer_get_data");
+    HPA_PROFILE_PUSH("buffer_get_data");
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
-    HPA_POP();
+    HPA_PROFILE_POP();
     if (static_cast<uint32_t>(data.size()) != d_buf_size) {
         ERR_PRINT("IPCVisuals: buffer_get_data returned unexpected size — skipping memcpy.");
         return false;
     }
 
-    HPA_PUSH("memcpy");
+    HPA_PROFILE_PUSH("memcpy");
     memcpy(dst, data.ptr(), d_buf_size);
-    HPA_POP();
+    HPA_PROFILE_POP();
 
     return true;
 }

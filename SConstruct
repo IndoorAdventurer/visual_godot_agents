@@ -5,6 +5,10 @@ import sys
 # You can find documentation for SCons and SConstruct files at:
 # https://scons.org/documentation.html
 
+# Consume hpa_profile before godot-cpp's SConstruct runs its own Variables()
+# check — otherwise godot-cpp warns about an unknown variable.
+hpa_profile = ARGUMENTS.pop("hpa_profile", "0") == "1"
+
 # This lets SCons know that we're using godot-cpp, from the godot-cpp folder.
 env = SConscript("godot-cpp/SConstruct")
 
@@ -14,7 +18,7 @@ env.Append(CPPPATH=["src/"])
 # Optional NVTX profiling markers — compile with `hpa_profile=1` to enable.
 # We use a separate named argument rather than CPPDEFINES=... on the command line
 # because the latter replaces godot-cpp's defines instead of appending to them.
-if ARGUMENTS.get("hpa_profile", "0") == "1":
+if hpa_profile:
     env.Append(CPPDEFINES=["HPA_PROFILE"])
     # nvtx3 C++ wrapper is header-only; the underlying C library is loaded at runtime via dlopen.
     env.Append(CPPPATH=["/usr/lib/x86_64-linux-gnu/nsight-systems/target-linux-x64/nvtx/include"])

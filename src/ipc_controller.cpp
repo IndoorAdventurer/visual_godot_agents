@@ -64,26 +64,26 @@ bool IPCController::exchange() {
     uint8_t *shm = static_cast<uint8_t *>(d_posix.get_shm_ptr());
 
     // Read the current GPU frame directly into the visual obs block in shared memory.
-    HPA_PUSH("fetch_frame");
+    HPA_PROFILE_PUSH("fetch_frame");
     bool ok = d_vis.fetch_frame(shm + d_visual_obs_offset);
-    HPA_POP();
+    HPA_PROFILE_POP();
     if (!ok) {
         ERR_PRINT("IPCController: GPU readback failed.");
         return false;
     }
 
-    HPA_PUSH("write_env_state");
+    HPA_PROFILE_PUSH("write_env_state");
     _write_env_state();
-    HPA_POP();
+    HPA_PROFILE_POP();
 
     // Hand over control to Python and wait for actions:
-    HPA_PUSH("posix_step");
+    HPA_PROFILE_PUSH("posix_step");
     d_posix.step();
-    HPA_POP();
+    HPA_PROFILE_POP();
 
-    HPA_PUSH("dispatch_actions");
+    HPA_PROFILE_PUSH("dispatch_actions");
     _dispatch_actions();
-    HPA_POP();
+    HPA_PROFILE_POP();
 
     return true;
 }
