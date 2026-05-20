@@ -1,4 +1,5 @@
 #include "hpa_master_node.h"
+#include "hpa_profile.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -49,12 +50,19 @@ void HPAMasterNode::_ready() {
 void HPAMasterNode::_physics_process(double) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
+    HPA_RANGE("HPAMasterNode::_physics_process");
+
     // Render before exchange so fetch_frame() reads the post-physics frame, not a stale one.
+    HPA_PUSH("force_draw");
     RenderingServer::get_singleton()->force_draw(false);
+    HPA_POP();
+
+    HPA_PUSH("exchange");
     if (!d_ipc.exchange()) {
         ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
         get_tree()->quit();
     }
+    HPA_POP();
 }
 
 PackedStringArray HPAMasterNode::_get_configuration_warnings() const {

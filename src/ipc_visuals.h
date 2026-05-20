@@ -5,10 +5,6 @@
 #include <cstdint>
 #include <vector>
 
-#ifdef HPA_PROFILE
-#include "hpa_profile.h"
-#endif
-
 namespace godot {
 
     /**

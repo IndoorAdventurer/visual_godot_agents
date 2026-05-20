@@ -11,6 +11,14 @@ env = SConscript("godot-cpp/SConstruct")
 # Configures the 'src' directory as a source for header files.
 env.Append(CPPPATH=["src/"])
 
+# Optional NVTX profiling markers — compile with `hpa_profile=1` to enable.
+# We use a separate named argument rather than CPPDEFINES=... on the command line
+# because the latter replaces godot-cpp's defines instead of appending to them.
+if ARGUMENTS.get("hpa_profile", "0") == "1":
+    env.Append(CPPDEFINES=["HPA_PROFILE"])
+    # nvtx3 C++ wrapper is header-only; the underlying C library is loaded at runtime via dlopen.
+    env.Append(CPPPATH=["/usr/lib/x86_64-linux-gnu/nsight-systems/target-linux-x64/nvtx/include"])
+
 # Collects all .cpp files in the 'src' folder as compile targets.
 sources = Glob("src/*.cpp")
 

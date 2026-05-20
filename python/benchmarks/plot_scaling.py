@@ -134,6 +134,65 @@ def plot_warmup_profile(df: pd.DataFrame, rolling_window: int = 20) -> plt.Figur
     return fig
 
 
+# ── Plot: frametime profile ───────────────────────────────────────────────────
+
+def plot_frametime_profile(
+    df: pd.DataFrame,
+    rolling_window: int = 20,
+    steady_state_start: int = 1000,
+) -> plt.Figure:
+    """
+    Per-step latency (ms) over step index for each num_envs in the
+    warmup-profile records.
+
+    Directly comparable to the frame-spacing visible in nsys: read the
+    steady-state mean off the horizontal reference line and cross-check
+    against the gap between successive vkWaitForFences completions in the
+    nsys timeline.
+    """
+    warmup = df[df["record_type"] == "warmup_profile"].copy()
+    if warmup.empty:
+        raise ValueError("No warmup_profile records found in data.")
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    for _, row in warmup.sort_values("num_envs").iterrows():
+        lats_ms = row["step_latencies_s"] * 1000
+        steps = np.arange(len(lats_ms))
+
+        # Raw (faint) + rolling mean (solid)
+        rolled = pd.Series(lats_ms).rolling(rolling_window, min_periods=1).mean().to_numpy()
+
+        label = f"{row['num_envs']} env{'s' if row['num_envs'] != 1 else ''}"
+        (line,) = ax.plot(steps, rolled, linewidth=1.8, label=label)
+        ax.plot(steps, lats_ms, color=line.get_color(), alpha=0.15, linewidth=0.6)
+
+        # Horizontal reference line at the steady-state mean so the number is
+        # easy to read off and compare against nsys.
+        if len(lats_ms) > steady_state_start:
+            steady_mean = lats_ms[steady_state_start:].mean()
+            ax.axhline(steady_mean, color=line.get_color(), linestyle=":", linewidth=1.2)
+            ax.text(
+                len(lats_ms) - 1, steady_mean,
+                f" {steady_mean:.2f} ms",
+                color=line.get_color(),
+                va="bottom", ha="right", fontsize=8,
+            )
+
+    if steady_state_start > 0:
+        ax.axvline(steady_state_start, color="gray", linestyle="--",
+                   linewidth=0.8, label=f"steady-state start ({steady_state_start})")
+
+    ax.set_xlabel("Step index")
+    ax.set_ylabel("Step latency (ms)")
+    ax.set_title(f"Frametime profile — latency over time\n"
+                 f"(solid = {rolling_window}-step rolling mean, "
+                 f"dotted = steady-state mean)")
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
 # ── Plot: throughput vs num_envs ───────────────────────────────────────────────
 
 def plot_throughput_vs_envs(df: pd.DataFrame) -> plt.Figure:
@@ -279,7 +338,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--summary", action="store_true",
                    help="Print a text summary table instead of plotting")
     p.add_argument("--rolling-window", type=int, default=20, metavar="N",
-                   help="Rolling-mean window for the warmup profile plot")
+                   help="Rolling-mean window for the warmup/frametime profile plots")
+    p.add_argument("--steady-state-start", type=int, default=1000, metavar="N",
+                   help="Step index after which the frametime is considered steady-state "
+                        "(used for the reference line in frametime_profile.png)")
     return p
 
 
@@ -301,12 +363,14 @@ def main() -> None:
 
     plots = [
         ("warmup_profile",      "warmup_profile.png",       "warmup_profile"),
+        ("frametime_profile",   "frametime_profile.png",    "warmup_profile"),
         ("scaling_throughput",  "scaling_throughput.png",   "scaling"),
         ("scaling_latency",     "scaling_latency.png",      "scaling"),
     ]
 
     generators = {
         "warmup_profile":     lambda: plot_warmup_profile(df, args.rolling_window),
+        "frametime_profile":  lambda: plot_frametime_profile(df, args.rolling_window, args.steady_state_start),
         "scaling_throughput": lambda: plot_throughput_vs_envs(df),
         "scaling_latency":    lambda: plot_latency_percentiles(df),
     }
