@@ -23,6 +23,7 @@ namespace godot {
         RID d_shader;
         RID d_pipeline;
         RID d_staging_buffer;
+        RID d_probe_buffer;  // 4-byte buffer used as a GPU sync point for profiling
         RID d_sampler;
 
         // SubViewport RIDs, one per env. Populated in initialize() via

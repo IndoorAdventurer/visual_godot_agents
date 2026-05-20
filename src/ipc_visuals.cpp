@@ -40,6 +40,7 @@ IPCVisuals::~IPCVisuals() {
     if (d_pipeline.is_valid())       d_rd->free_rid(d_pipeline);
     if (d_shader.is_valid())         d_rd->free_rid(d_shader);
     if (d_sampler.is_valid())        d_rd->free_rid(d_sampler);
+    if (d_probe_buffer.is_valid())   d_rd->free_rid(d_probe_buffer);
     if (d_staging_buffer.is_valid()) d_rd->free_rid(d_staging_buffer);
 }
 
@@ -70,6 +71,14 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
     d_staging_buffer = d_rd->storage_buffer_create(d_buf_size);
     if (!d_staging_buffer.is_valid()) {
         ERR_PRINT("IPCVisuals: failed to create staging buffer.");
+        return false;
+    }
+
+    // Tiny buffer used as a GPU sync probe: calling buffer_get_data on it forces
+    // any pending GPU work to complete without reading the full staging buffer.
+    d_probe_buffer = d_rd->storage_buffer_create(4);
+    if (!d_probe_buffer.is_valid()) {
+        ERR_PRINT("IPCVisuals: failed to create probe buffer.");
         return false;
     }
 
@@ -180,6 +189,12 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
             return false;
     }
 
+    // Probe the GPU before dispatching compute — this absorbs the fence-wait for
+    // the viewport renders submitted by force_draw(), isolating render GPU time.
+    HPA_PROFILE_PUSH("render_gpu_wait");
+    (void)d_rd->buffer_get_data(d_probe_buffer, 0, 4);
+    HPA_PROFILE_POP();
+
     HPA_PROFILE_PUSH("compute_dispatch");
     int64_t compute_list = d_rd->compute_list_begin();
     {
@@ -213,6 +228,12 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         }
     }
     d_rd->compute_list_end();
+    HPA_PROFILE_POP();
+
+    // Probe again after dispatch — this submits the deferred compute commands
+    // and waits for them, isolating compute GPU time from the transfer below.
+    HPA_PROFILE_PUSH("compute_gpu_wait");
+    (void)d_rd->buffer_get_data(d_probe_buffer, 0, 4);
     HPA_PROFILE_POP();
 
     HPA_PROFILE_PUSH("buffer_get_data");
