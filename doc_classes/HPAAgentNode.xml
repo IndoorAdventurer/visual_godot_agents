@@ -9,6 +9,16 @@
 		Override the per-step callbacks to implement your environment's logic.
 	</description>
 	<methods>
+		<method name="get_env_index">
+			<return type="int" />
+			<description>
+				Returns the zero-based index of this environment instance, assigned by [HPAMasterNode] during startup. Use it to, for example, offset random seeds so parallel environments are not identical:
+				[codeblock]
+				var rng = RandomNumberGenerator.new()
+				rng.seed = base_seed + get_env_index()
+				[/codeblock]
+			</description>
+		</method>
 		<method name="_get_scalar_obs_size" qualifiers="virtual">
 			<return type="int" />
 			<description>

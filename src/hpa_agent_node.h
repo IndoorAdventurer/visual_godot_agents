@@ -21,6 +21,8 @@ namespace godot {
     class HPAAgentNode : public Node {
         GDCLASS(HPAAgentNode, Node)
 
+        int64_t d_env_index = -1;   // Set by HPAMasterNode during scene setup
+
         public:
             HPAAgentNode() = default;
             ~HPAAgentNode() = default;
@@ -36,6 +38,18 @@ namespace godot {
             bool is_done();
             void reset();
 
+            /**
+             * Set by HPAMasterNode; not exposed as a setter to GDScript.
+             */
+            void set_env_index(int64_t index);
+
+            /**
+             * Readable from GDScript so environments can, for example, offset
+             * random seed to get unique one:
+             *   rng.seed = base_seed + get_env_index()
+             */
+            int64_t get_env_index() const;
+
             // --- GDScript-overridable interface ---
             // Override these in GDScript to implement your environment logic.
 
@@ -50,5 +64,13 @@ namespace godot {
         protected:
             static void _bind_methods();
     };
+
+    inline void HPAAgentNode::set_env_index(int64_t index) {
+        d_env_index = index;
+    }
+
+    inline int64_t HPAAgentNode::get_env_index() const {
+        return d_env_index;
+    }
 
 } // namespace godot

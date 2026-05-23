@@ -47,6 +47,7 @@ void HPAAgentNode::reset() {
 }
 
 void HPAAgentNode::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_env_index"), &HPAAgentNode::get_env_index);
     GDVIRTUAL_BIND(_get_scalar_obs_size);
     GDVIRTUAL_BIND(_get_action_size);
     GDVIRTUAL_BIND(_apply_action, "p_action");

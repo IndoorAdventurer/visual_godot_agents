@@ -271,7 +271,11 @@ std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
             ERR_PRINT("HPAMasterNode: no HPAAgentNode found in environment scene.");
             continue;
         }
-        agents.push_back(Object::cast_to<HPAAgentNode>(found[0]));
+        HPAAgentNode *agent = Object::cast_to<HPAAgentNode>(found[0]);
+        // Giving each agent its own index so it can be used, for example
+        // to give each environment a unique random seed later on:
+        agent->set_env_index(static_cast<int64_t>(agents.size()));
+        agents.push_back(agent);
     }
     return agents;
 }
