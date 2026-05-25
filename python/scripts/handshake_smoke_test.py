@@ -29,7 +29,7 @@ with IPCClient(name) as client:
 
     try:
         while True:
-            print(f"[step {step:>6}]  rewards: {state.rewards}  dones: {state.dones}")
+            print(f"[step {step:>6}]  rewards: {state.rewards}  terminated: {state.terminated}  truncated: {state.truncated}")
             state = client.step(actions)
             step += 1
     except KeyboardInterrupt:

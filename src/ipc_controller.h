@@ -47,11 +47,12 @@ namespace godot {
         std::vector<HPAAgentNode *> d_agents;
 
         // Byte offsets into shared memory, fixed after initialize():
-        size_t d_visual_obs_offset  = 0;
-        size_t d_scalar_obs_offset  = 0;
-        size_t d_rewards_offset     = 0;
-        size_t d_done_flags_offset  = 0;
-        size_t d_actions_offset     = 0;
+        size_t d_visual_obs_offset   = 0;
+        size_t d_scalar_obs_offset   = 0;
+        size_t d_rewards_offset      = 0;
+        size_t d_terminated_offset   = 0;
+        size_t d_truncated_offset    = 0;
+        size_t d_actions_offset      = 0;
 
         public:
             IPCController()  = default;
@@ -85,11 +86,15 @@ namespace godot {
             );
 
             /**
-             * Gathers data to send over to Python, then blocks until Python
-             * signals back with actions and processes them. Returns false if
-             * the GPU readback failed; caller should treat this as fatal.
+             * Resets any done environments, renders the current frame, gathers
+             * data to send to Python, then blocks until Python signals back with
+             * actions and processes them. Returns false on GPU readback failure;
+             * caller should treat this as fatal.
+             *
+             * @param p_delta  Physics delta, forwarded to force_draw() so shader
+             *                 TIME advances at the correct simulation rate.
              */
-            bool exchange();
+            bool exchange(double p_delta);
 
             /**
              * Replaces the stored agent pointers after an environment reset that
@@ -99,9 +104,17 @@ namespace godot {
 
         private:
             /**
+             * Triggers a render and immediately reads the resulting frame from the
+             * GPU into the visual obs block in shared memory. These two operations
+             * are inseparable: force_draw produces what fetch_frame consumes.
+             * Returns false if the GPU readback failed.
+             */
+            bool _render_and_fetch(double p_delta);
+
+            /**
              * Writes the header and all per-env outgoing data (scalar obs, reward,
-             * done flag) into shared memory. The visual obs section is left untouched —
-             * the GPU readback path writes there directly via d_visual_obs_offset.
+             * terminated/truncated flags) into shared memory. The visual obs section
+             * is left untouched — _render_and_fetch writes there directly.
              */
             void _write_env_state() const;
 

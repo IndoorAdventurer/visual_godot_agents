@@ -24,6 +24,14 @@ namespace godot {
         int64_t d_env_index = -1;   // Set by HPAMasterNode during scene setup
 
         public:
+            // Returned by get_episode_state() / _get_episode_state().
+            // Enforces the invariant that an episode cannot be both terminated and truncated.
+            enum EpisodeState : int64_t {
+                RUNNING    = 0,
+                TERMINATED = 1,  // Natural end: agent reached goal, failed, etc.
+                TRUNCATED  = 2,  // Artificial cut: time limit, out-of-bounds guard, etc.
+            };
+
             HPAAgentNode() = default;
             ~HPAAgentNode() = default;
 
@@ -35,7 +43,7 @@ namespace godot {
             void apply_action(PackedByteArray p_action);
             PackedByteArray collect_scalar_obs();
             float get_reward();
-            bool is_done();
+            EpisodeState get_episode_state();
             void reset();
 
             /**
@@ -58,7 +66,7 @@ namespace godot {
             GDVIRTUAL1(_apply_action, PackedByteArray);
             GDVIRTUAL0R(PackedByteArray, _collect_scalar_obs);
             GDVIRTUAL0R(float, _get_reward);
-            GDVIRTUAL0R(bool, _is_done);
+            GDVIRTUAL0R(int64_t, _get_episode_state);
             GDVIRTUAL0(_reset);
 
         protected:
@@ -74,3 +82,5 @@ namespace godot {
     }
 
 } // namespace godot
+
+VARIANT_ENUM_CAST(godot::HPAAgentNode::EpisodeState);

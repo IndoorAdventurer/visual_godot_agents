@@ -36,10 +36,10 @@ float HPAAgentNode::get_reward() {
     return ret;
 }
 
-bool HPAAgentNode::is_done() {
-    bool ret = false;
-    GDVIRTUAL_CALL(_is_done, ret);
-    return ret;
+HPAAgentNode::EpisodeState HPAAgentNode::get_episode_state() {
+    int64_t ret = static_cast<int64_t>(RUNNING);
+    GDVIRTUAL_CALL(_get_episode_state, ret);
+    return static_cast<EpisodeState>(ret);
 }
 
 void HPAAgentNode::reset() {
@@ -53,6 +53,10 @@ void HPAAgentNode::_bind_methods() {
     GDVIRTUAL_BIND(_apply_action, "p_action");
     GDVIRTUAL_BIND(_collect_scalar_obs);
     GDVIRTUAL_BIND(_get_reward);
-    GDVIRTUAL_BIND(_is_done);
+    GDVIRTUAL_BIND(_get_episode_state);
     GDVIRTUAL_BIND(_reset);
+
+    BIND_ENUM_CONSTANT(RUNNING);
+    BIND_ENUM_CONSTANT(TERMINATED);
+    BIND_ENUM_CONSTANT(TRUNCATED);
 }

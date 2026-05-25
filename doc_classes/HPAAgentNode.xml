@@ -50,17 +50,29 @@
 				Return the reward earned during this step.
 			</description>
 		</method>
-		<method name="_is_done" qualifiers="virtual">
-			<return type="bool" />
+		<method name="_get_episode_state" qualifiers="virtual">
+			<return type="int" enum="HPAAgentNode.EpisodeState" />
 			<description>
-				Return [code]true[/code] if the episode has ended and the environment should be reset.
+				Return the current episode state. Return [constant TERMINATED] when the episode ends naturally (goal reached, failure, etc.) or [constant TRUNCATED] when it ends artificially (time limit, out-of-bounds guard, etc.). Return [constant RUNNING] otherwise.
+				[HPAMasterNode] reads this each step and automatically resets the environment before collecting the next observation when the state is not [constant RUNNING], so [method _reset] will always be called before the next [method _collect_scalar_obs].
 			</description>
 		</method>
 		<method name="_reset" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				Reset the environment to its initial state for a new episode.
+				Reset the environment to its initial state for a new episode. Called automatically by [HPAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
 			</description>
 		</method>
 	</methods>
+	<constants>
+		<constant name="RUNNING" value="0" enum="EpisodeState">
+			The episode is ongoing. Normal operation.
+		</constant>
+		<constant name="TERMINATED" value="1" enum="EpisodeState">
+			The episode ended naturally: the agent reached its goal, failed, or otherwise reached a terminal state defined by the environment logic.
+		</constant>
+		<constant name="TRUNCATED" value="2" enum="EpisodeState">
+			The episode ended artificially: a time limit expired, the agent left the valid region, or some other external condition cut the episode short.
+		</constant>
+	</constants>
 </class>

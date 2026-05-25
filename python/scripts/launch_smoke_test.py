@@ -52,7 +52,7 @@ with IPCClient("hpa") as client:
     actions = np.zeros((client.num_envs, client.action_size), dtype=np.uint8)
 
     for step in range(args.steps):
-        print(f"[step {step:>4}]  rewards: {state.rewards}  dones: {state.dones}")
+        print(f"[step {step:>4}]  rewards: {state.rewards}  terminated: {state.terminated}  truncated: {state.truncated}")
         state = client.step(actions)
 
     print(f"Done — {args.steps} steps completed, shutting down Godot.")

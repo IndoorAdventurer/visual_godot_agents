@@ -13,10 +13,11 @@ class EnvState:
     Arrays are updated in-place by Godot each step — copy explicitly if you
     need to retain values across a step() call.
     """
-    visual_obs: np.ndarray   # (N, H, W, C)  uint8
-    scalar_obs: np.ndarray   # (N, scalar_obs_size)  uint8
-    rewards:    np.ndarray   # (N,)                  float32
-    dones:      np.ndarray   # (N,)                  uint8
+    visual_obs:  np.ndarray   # (N, H, W, C)  uint8
+    scalar_obs:  np.ndarray   # (N, scalar_obs_size)  uint8
+    rewards:     np.ndarray   # (N,)                  float32
+    terminated:  np.ndarray   # (N,)                  uint8  — natural episode end
+    truncated:   np.ndarray   # (N,)                  uint8  — artificial episode end
 
 
 class _Header(ctypes.Structure):
@@ -190,18 +191,20 @@ class IPCClient:
         self.action_size     = header.action_size
 
         visual_obs_off  = _HEADER_SIZE
-        scalar_obs_off  = visual_obs_off + self.num_envs * self.visual_obs_size
-        rewards_off     = scalar_obs_off + self.num_envs * self.scalar_obs_size
-        done_flags_off  = rewards_off    + self.num_envs * 4  # float32
-        actions_off     = done_flags_off + self.num_envs      # uint8
+        scalar_obs_off  = visual_obs_off   + self.num_envs * self.visual_obs_size
+        rewards_off     = scalar_obs_off   + self.num_envs * self.scalar_obs_size
+        terminated_off  = rewards_off      + self.num_envs * 4  # float32
+        truncated_off   = terminated_off   + self.num_envs      # uint8
+        actions_off     = truncated_off    + self.num_envs      # uint8
 
         view = lambda offset, dtype, shape: np.ndarray(shape=shape, dtype=dtype, buffer=self._mem, offset=offset)
 
         self._state = EnvState(
-            visual_obs=view(visual_obs_off, np.uint8,   (self.num_envs, self.visual_height, self.visual_width, self.visual_channels)),
-            scalar_obs=view(scalar_obs_off, np.uint8,   (self.num_envs, self.scalar_obs_size)),
-            rewards=   view(rewards_off,    np.float32, (self.num_envs,)),
-            dones=     view(done_flags_off, np.uint8,   (self.num_envs,)),
+            visual_obs= view(visual_obs_off,  np.uint8,   (self.num_envs, self.visual_height, self.visual_width, self.visual_channels)),
+            scalar_obs= view(scalar_obs_off,  np.uint8,   (self.num_envs, self.scalar_obs_size)),
+            rewards=    view(rewards_off,      np.float32, (self.num_envs,)),
+            terminated= view(terminated_off,  np.uint8,   (self.num_envs,)),
+            truncated=  view(truncated_off,    np.uint8,   (self.num_envs,)),
         )
         self._actions_buf = view(actions_off, np.uint8, (self.num_envs, self.action_size))
 
