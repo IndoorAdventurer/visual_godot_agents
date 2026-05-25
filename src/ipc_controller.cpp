@@ -63,11 +63,18 @@ bool IPCController::initialize(
 }
 
 bool IPCController::exchange(double p_delta) {
-    // Reset any environments that finished last step before rendering so that
-    // the observation Python receives is truly obs_0 of the new episode, not a
-    // state advanced one physics tick beyond the reset point.
+    // Reset environments that finished in the PREVIOUS exchange. We read the
+    // terminated/truncated flags written to shm by the previous _write_env_state()
+    // call — nothing touches those bytes between then and now, so they are a
+    // reliable record of what Python was told. Calling get_episode_state() here
+    // would be wrong: dispatch_actions() from the previous exchange may have
+    // already overwritten the agent variables (e.g. last_action_byte) that
+    // _get_episode_state() reads.
+    // Resetting here, before force_draw(), ensures Python receives true obs_0:
+    // the render fires before world._physics_process runs and before physics integrates.
+    const uint8_t *shm_base = static_cast<const uint8_t *>(d_posix.get_shm_ptr());
     for (size_t i = 0; i != d_num_envs; ++i) {
-        if (d_agents[i]->get_episode_state() != HPAAgentNode::RUNNING)
+        if (shm_base[d_terminated_offset + i] || shm_base[d_truncated_offset + i])
             d_agents[i]->reset();
     }
 
