@@ -1,0 +1,185 @@
+"""
+GodotVectorEnv — gymnasium.vector.VectorEnv wrapper around IPCClient.
+
+Plug-and-play with CleanRL and other gymnasium-compatible training loops.
+All action encoding/decoding happens internally; callers work with native
+gymnasium spaces throughout.
+
+Supported action space types
+-----------------------------
+Box(dtype=*)      — raw dtype copy; action_size must equal flat_dim * itemsize
+MultiDiscrete     — one uint8 per dimension; action_size must equal len(nvec)
+Discrete          — single uint8; action_size must equal 1
+"""
+
+import numpy as np
+import gymnasium
+import gymnasium.spaces.utils as gym_utils
+from typing import Any
+
+from .ipc_client import IPCClient
+
+
+class GodotVectorEnv(gymnasium.vector.VectorEnv):
+    """
+    Wraps IPCClient as a gymnasium VectorEnv.
+
+    Observation space is per-environment. Pass a Box for visual-only obs, or a
+    Dict{"visual": Box, "scalar": Box} when include_scalar_obs=True.
+
+    If godot_binary is None, Godot is not launched — the caller is responsible
+    for starting it manually before calling reset().
+    """
+
+    def __init__(
+        self,
+        name: str,
+        num_envs: int,
+        observation_space: gymnasium.Space,
+        action_space: gymnasium.Space,
+        include_scalar_obs: bool = False,
+        godot_binary: str | None = None,
+        project_path: str | None = None,
+        obs_width: int | None = None,
+        obs_height: int | None = None,
+        step_rate_hz: int | None = None,
+        extra_args: dict[str, str] | None = None,
+    ):
+        super().__init__(num_envs, observation_space, action_space)
+
+        self._include_scalar_obs = include_scalar_obs
+        self._action_dtype, self._action_flat_dim = _parse_action_space(action_space)
+        self._connected = False
+
+        self._client = IPCClient(name)
+
+        if godot_binary is not None:
+            # Semaphores are already created by IPCClient.__init__ above, so
+            # Godot can safely open them the moment the subprocess starts.
+            self._client.launch_godot(
+                godot_binary,
+                project_path=project_path,
+                num_envs=num_envs,
+                obs_width=obs_width,
+                obs_height=obs_height,
+                step_rate_hz=step_rate_hz,
+                extra_args=extra_args,
+            )
+
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[Any, dict]:
+        if self._connected:
+            # TODO: implement a proper forced-reset signal over IPC so callers
+            # can reset mid-episode. For now, Godot handles per-env auto-reset
+            # and CleanRL only calls reset() once at startup, so this is fine.
+            return self._get_obs(), {}
+
+        self._state = self._client.connect()
+        self._connected = True
+        self._validate_layout()
+        return self._get_obs(), {}
+
+    def step(
+        self, actions: np.ndarray
+    ) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray, dict]:
+        encoded = self._encode_actions(actions)
+        self._state = self._client.step(encoded)
+        return (
+            self._get_obs(),
+            self._state.rewards.copy(),
+            self._state.terminated.astype(bool),
+            self._state.truncated.astype(bool),
+            {},
+        )
+
+    def close(self) -> None:
+        self._client.close()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _get_obs(self) -> Any:
+        if self._include_scalar_obs:
+            return {
+                "visual": self._state.visual_obs.copy(),
+                "scalar": self._state.scalar_obs.copy(),
+            }
+        return self._state.visual_obs.copy()
+
+    def _encode_actions(self, actions: np.ndarray) -> np.ndarray:
+        """Convert actions from the gymnasium action space dtype to uint8 bytes."""
+        # View the flat per-env byte representation as uint8 for the IPC buffer.
+        flat = actions.reshape(self.num_envs, self._action_flat_dim)
+        if flat.dtype != self._action_dtype:
+            flat = flat.astype(self._action_dtype)
+        return flat.view(np.uint8).reshape(self.num_envs, -1)
+
+    def _validate_layout(self) -> None:
+        """
+        Cross-check that the observation/action spaces match what Godot's header
+        reports. Raises ValueError on any mismatch so stale space definitions are
+        caught immediately rather than causing silent wrong-shape training runs.
+        """
+        c = self._client
+
+        if c.num_envs != self.num_envs:
+            raise ValueError(
+                f"num_envs mismatch: GodotVectorEnv was told {self.num_envs} "
+                f"but Godot reports {c.num_envs}"
+            )
+
+        # Visual obs
+        visual_space = (
+            self.observation_space["visual"]
+            if self._include_scalar_obs
+            else self.observation_space
+        )
+        expected_visual = (c.visual_height, c.visual_width, c.visual_channels)
+        if visual_space.shape != expected_visual:
+            raise ValueError(
+                f"visual obs shape mismatch: space has {visual_space.shape}, "
+                f"Godot reports {expected_visual}"
+            )
+
+        # Scalar obs (optional)
+        if self._include_scalar_obs:
+            scalar_space = self.observation_space["scalar"]
+            if scalar_space.shape[0] != c.scalar_obs_size:
+                raise ValueError(
+                    f"scalar obs size mismatch: space has {scalar_space.shape[0]}, "
+                    f"Godot reports {c.scalar_obs_size}"
+                )
+
+        # Actions: flat_dim * itemsize must equal the raw byte count per env
+        expected_bytes = self._action_flat_dim * np.dtype(self._action_dtype).itemsize
+        if expected_bytes != c.action_size:
+            raise ValueError(
+                f"action size mismatch: space implies {expected_bytes} bytes per env "
+                f"({self._action_flat_dim} elements × "
+                f"{np.dtype(self._action_dtype).itemsize} bytes), "
+                f"Godot reports {c.action_size}"
+            )
+
+
+def _parse_action_space(space: gymnasium.Space) -> tuple[np.dtype, int]:
+    """
+    Return (dtype, flat_element_count) for the given action space.
+
+    The IPC buffer stores action_size bytes per env. For dtype d and flat_dim
+    elements: action_size must equal flat_dim * d.itemsize.
+    """
+    if isinstance(space, gymnasium.spaces.Box):
+        return np.dtype(space.dtype), gym_utils.flatdim(space)
+    if isinstance(space, gymnasium.spaces.MultiDiscrete):
+        return np.dtype(np.uint8), len(space.nvec)
+    if isinstance(space, gymnasium.spaces.Discrete):
+        return np.dtype(np.uint8), 1
+    raise TypeError(
+        f"Unsupported action space type {type(space).__name__}. "
+        "Use Box, MultiDiscrete, or Discrete."
+    )

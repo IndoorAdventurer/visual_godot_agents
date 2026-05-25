@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gymnasium = ["gymnasium"]
 dev = [
     "matplotlib",
     "pyqt5",
