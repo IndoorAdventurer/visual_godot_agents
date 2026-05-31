@@ -2,6 +2,9 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 
 using namespace godot;
 
@@ -44,6 +47,22 @@ HPAAgentNode::EpisodeState HPAAgentNode::get_episode_state() {
 
 void HPAAgentNode::reset() {
     GDVIRTUAL_CALL(_reset);
+
+    // Force the physics server to flush deferred transform updates for every
+    // Node3D in this environment. Without this, position changes made during
+    // _reset() (e.g. teleporting a CharacterBody3D) take one extra step to
+    // propagate, while other state like material overrides is visible immediately.
+    // We anchor on get_viewport() because it always returns this env's SubViewport
+    // regardless of where HPAAgentNode sits in the scene hierarchy.
+    Viewport *vp = get_viewport();
+    if (!vp)
+        return;
+    TypedArray<Node> nodes = vp->find_children("*", "Node3D", true, false);
+    for (int i = 0; i < nodes.size(); ++i) {
+        Node3D *n = Object::cast_to<Node3D>(nodes[i]);
+        if (n)
+            n->force_update_transform();
+    }
 }
 
 void HPAAgentNode::_bind_methods() {

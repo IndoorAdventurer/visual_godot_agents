@@ -7,8 +7,9 @@
 *.dblite
 src/gen/
 
-# Excluding the test project:
+# Excluding the test projects:
 high-performance-godot-agents/
+godot-rl-compute-shader-demo/
 
 # Brainstorming/design notes:
 design/
