@@ -20,4 +20,4 @@ This library is specifically designed for environments with **large observation 
 [//]: # (    5. _get_episode_state)
 [//]: # (    6. wait for Python actions)
 [//]: # (    7. _apply_action)
-[//]: # (- reward design notes: _get_reward is always called before _get_episode_state in the same step))
+[//]: # (- reward design notes: _get_reward is always called before _get_episode_state in the same step)
