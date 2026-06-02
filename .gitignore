@@ -23,3 +23,7 @@ __pycache__/
 python/**/*.jsonl
 python/**/*.qdstrm
 python/**/*.nsys-rep
+
+# Images:
+*.png
+*.svg

@@ -1,5 +1,5 @@
 """
-GodotVectorEnv — gymnasium.vector.VectorEnv wrapper around IPCClient.
+GodotVectorEnv — gymnasium.vector.VectorEnv wrapper around MultiIPCClient.
 
 Plug-and-play with CleanRL and other gymnasium-compatible training loops.
 All action encoding/decoding happens internally; callers work with native
@@ -17,18 +17,18 @@ import gymnasium
 import gymnasium.spaces.utils as gym_utils
 from typing import Any
 
-from .ipc_client import IPCClient
+from .multi_ipc_client import MultiIPCClient
 
 
 class GodotVectorEnv(gymnasium.vector.VectorEnv):
     """
-    Wraps IPCClient as a gymnasium VectorEnv.
+    Wraps MultiIPCClient as a gymnasium VectorEnv.
 
     Observation space is per-environment. Pass a Box for visual-only obs, or a
     Dict{"visual": Box, "scalar": Box} when include_scalar_obs=True.
 
     If godot_binary is None, Godot is not launched — the caller is responsible
-    for starting it manually before calling reset().
+    for starting it manually before calling reset() (only valid for num_instances=1).
     """
 
     def __init__(
@@ -38,6 +38,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         observation_space: gymnasium.Space,
         action_space: gymnasium.Space,
         include_scalar_obs: bool = False,
+        num_instances: int = 1,
         godot_binary: str | None = None,
         project_path: str | None = None,
         obs_width: int | None = None,
@@ -51,20 +52,17 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         self._action_dtype, self._action_flat_dim = _parse_action_space(action_space)
         self._connected = False
 
-        self._client = IPCClient(name)
-
-        if godot_binary is not None:
-            # Semaphores are already created by IPCClient.__init__ above, so
-            # Godot can safely open them the moment the subprocess starts.
-            self._client.launch_godot(
-                godot_binary,
-                project_path=project_path,
-                num_envs=num_envs,
-                obs_width=obs_width,
-                obs_height=obs_height,
-                step_rate_hz=step_rate_hz,
-                extra_args=extra_args,
-            )
+        self._client = MultiIPCClient(
+            name,
+            num_envs=num_envs,
+            num_instances=num_instances,
+            godot_binary=godot_binary,
+            project_path=project_path,
+            obs_width=obs_width,
+            obs_height=obs_height,
+            step_rate_hz=step_rate_hz,
+            extra_args=extra_args,
+        )
 
     def reset(
         self,
@@ -90,7 +88,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         self._state = self._client.step(encoded)
         return (
             self._get_obs(),
-            self._state.rewards.copy(),
+            self._state.rewards,
             self._state.terminated.astype(bool),
             self._state.truncated.astype(bool),
             {},
@@ -106,10 +104,10 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
     def _get_obs(self) -> Any:
         if self._include_scalar_obs:
             return {
-                "visual": self._state.visual_obs.copy(),
-                "scalar": self._state.scalar_obs.copy(),
+                "visual": self._state.visual_obs,
+                "scalar": self._state.scalar_obs,
             }
-        return self._state.visual_obs.copy()
+        return self._state.visual_obs
 
     def _encode_actions(self, actions: np.ndarray) -> np.ndarray:
         """Convert actions from the gymnasium action space dtype to uint8 bytes."""
