@@ -16,7 +16,8 @@ gymnasium = ["gymnasium"]
 dev = [
     "matplotlib",
     "pyqt5",
-    "pandas"
+    "pandas",
+    "opencv-python"
 ]
 
 [tool.hatch.build.targets.wheel]
