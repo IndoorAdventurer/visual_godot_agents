@@ -9,7 +9,7 @@ src/gen/
 
 # Excluding the test projects:
 high-performance-godot-agents/
-godot-rl-compute-shader-demo/
+# godot-rl-compute-shader-demo/
 
 # Brainstorming/design notes:
 design/

@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://c3n1y1rrbxtqy"]
+
+[ext_resource type="PackedScene" uid="uid://mxj3wjnngts8" path="res://env.tscn" id="1_ig7tw"]
+
+[node name="HPAMasterNode" type="HPAMasterNode" unique_id=827244961]
+environment_scene = ExtResource("1_ig7tw")
+obs_resolution = Vector2i(512, 512)

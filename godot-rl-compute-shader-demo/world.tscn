@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://b5ah0nudduyms"]
+
+[ext_resource type="Script" uid="uid://c1i2gx28u0snm" path="res://dirt_system.gd" id="1_f3sb7"]
+[ext_resource type="Script" uid="uid://dhx7h3cglpo2l" path="res://trail_system.gd" id="2_tlwt5"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_gv5m4"]
+size = Vector2(5, 5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gv5m4"]
+size = Vector3(5, 0.1, 5)
+
+[node name="World" type="Node3D" unique_id=1180275148]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1669701503]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1767962770]
+mesh = SubResource("PlaneMesh_gv5m4")
+script = ExtResource("2_tlwt5")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=1044135471]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_gv5m4")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=829727952]
+transform = Transform3D(0.70710677, -0.5, 0.49999997, 0, 0.70710677, 0.7071068, -0.70710677, -0.5, 0.49999997, 0, 3, 0)
+
+[node name="DirtSystem" type="Node3D" parent="." unique_id=1469804442]
+script = ExtResource("1_f3sb7")
