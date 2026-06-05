@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="HPAAgentNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="VGAAgentNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 	Abstract agent endpoint for a single parallel environment. Subclass this in GDScript to implement your environment logic.
 	</brief_description>
 	<description>
-		Place exactly one subclass of [HPAAgentNode] inside your environment scene. [HPAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
+		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
 		Override [method _get_scalar_obs_size] and [method _get_action_size] to declare the size of your observation and action spaces in bytes. These are queried once at startup and must remain constant for the lifetime of the node.
 		Override the per-step callbacks to implement your environment's logic.
 	</description>
@@ -12,7 +12,7 @@
 		<method name="get_env_index">
 			<return type="int" />
 			<description>
-				Returns the zero-based index of this environment instance, assigned by [HPAMasterNode] during startup. Use it to, for example, offset random seeds so parallel environments are not identical:
+				Returns the zero-based index of this environment instance, assigned by [VGAMasterNode] during startup. Use it to, for example, offset random seeds so parallel environments are not identical:
 				[codeblock]
 				var rng = RandomNumberGenerator.new()
 				rng.seed = base_seed + get_env_index()
@@ -51,16 +51,16 @@
 			</description>
 		</method>
 		<method name="_get_episode_state" qualifiers="virtual">
-			<return type="int" enum="HPAAgentNode.EpisodeState" />
+			<return type="int" enum="VGAAgentNode.EpisodeState" />
 			<description>
 				Return the current episode state. Return [constant TERMINATED] when the episode ends naturally (goal reached, failure, etc.) or [constant TRUNCATED] when it ends artificially (time limit, out-of-bounds guard, etc.). Return [constant RUNNING] otherwise.
-				[HPAMasterNode] reads this each step and automatically resets the environment before collecting the next observation when the state is not [constant RUNNING], so [method _reset] will always be called before the next [method _collect_scalar_obs].
+				[VGAMasterNode] reads this each step and automatically resets the environment before collecting the next observation when the state is not [constant RUNNING], so [method _reset] will always be called before the next [method _collect_scalar_obs].
 			</description>
 		</method>
 		<method name="_reset" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				Reset the environment to its initial state for a new episode. Called automatically by [HPAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
+				Reset the environment to its initial state for a new episode. Called automatically by [VGAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
 			</description>
 		</method>
 	</methods>

@@ -37,7 +37,7 @@ _HEADER_SIZE = ctypes.sizeof(_Header)
 
 class IPCClient:
     """
-    Low-level Python client for the HPA IPC protocol.
+    Low-level Python client for the VGA IPC protocol.
 
     Python creates and owns the semaphores; Godot creates and owns the shared
     memory. On connect(), Python blocks on env_ready until Godot has written
@@ -108,7 +108,7 @@ class IPCClient:
         a standalone exported executable directly. Either way, ipc_name is always
         forwarded so Godot connects to this client's shared memory region.
 
-        HPAMasterNode property overrides (num_envs, obs_width, obs_height,
+        VGAMasterNode property overrides (num_envs, obs_width, obs_height,
         step_rate_hz) are only forwarded when not None — Godot falls back to
         whatever is set in the scene inspector otherwise.
 

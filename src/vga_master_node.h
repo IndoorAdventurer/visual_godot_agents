@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ipc_controller.h"
-#include "hpa_agent_node.h"
+#include "vga_agent_node.h"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
@@ -13,8 +13,8 @@ namespace godot {
      * Runs N instances of your environment in parallel, and is responsible
      * for syncing/communicating with Python via shared memory.
      */
-    class HPAMasterNode : public Node {
-        GDCLASS(HPAMasterNode, Node)
+    class VGAMasterNode : public Node {
+        GDCLASS(VGAMasterNode, Node)
 
         // physics_ticks_per_second = SIM_TIME_MULTIPLIER * step_rate_hz, making the
         // physics step ~17 ns — far smaller than any main-loop iteration. The accumulator
@@ -27,14 +27,14 @@ namespace godot {
         Vector2i d_obs_res;           // Resolution of observation space
         String d_ipc_name;            // Shared name for SHM region and semaphores
         int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
-        Dictionary d_user_args;       // Parsed cmdline args not consumed by HPAMasterNode; exposed to GDScript
+        Dictionary d_user_args;       // Parsed cmdline args not consumed by VGAMasterNode; exposed to GDScript
 
         IPCController d_ipc;          // Responsible for all IPC with Python
         bool d_initialized;           // Set only after _ready() succeeds fully
 
         public:
-            HPAMasterNode();
-            ~HPAMasterNode() = default;
+            VGAMasterNode();
+            ~VGAMasterNode() = default;
 
             void _ready() override;
             void _physics_process(double p_delta) override;
@@ -58,7 +58,7 @@ namespace godot {
         private:
             /**
              * Parse key=value pairs from OS::get_cmdline_user_args() and apply them to
-             * HPAMasterNode properties. Must be called before _configure_sim_loop() so
+             * VGAMasterNode properties. Must be called before _configure_sim_loop() so
              * overrides are in effect when the sim loop is set up. Unknown keys are
              * stored in d_user_args and exposed to GDScript via get_user_args().
              */
@@ -77,10 +77,10 @@ namespace godot {
             std::vector<SubViewport *> _init_envs();
 
             /**
-             * Walks subviewport children and returns the HPAAgentNode found in
+             * Walks subviewport children and returns the VGAAgentNode found in
              * each environment scene. Called in _ready() after _init_envs().
              */
-            std::vector<HPAAgentNode *> _collect_agents();
+            std::vector<VGAAgentNode *> _collect_agents();
     };
 
 } // namespace godot

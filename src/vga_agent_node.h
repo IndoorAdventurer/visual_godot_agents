@@ -11,17 +11,17 @@ namespace godot {
      * Derive from this in GDScript to implement your environment's
      * action decoding, observation collection, reward, and reset logic.
      *
-     * Exactly one HPAAgentNode (or subclass) must exist per environment scene.
-     * HPAMasterNode will locate it automatically.
+     * Exactly one VGAAgentNode (or subclass) must exist per environment scene.
+     * VGAMasterNode will locate it automatically.
      *
      * GDScript subclasses override the underscore-prefixed GDVIRTUAL methods.
      * C++ callers (e.g. IPCController) use the unprefixed wrapper methods,
      * which route through Godot's script dispatch so GDScript overrides are found.
      */
-    class HPAAgentNode : public Node {
-        GDCLASS(HPAAgentNode, Node)
+    class VGAAgentNode : public Node {
+        GDCLASS(VGAAgentNode, Node)
 
-        int64_t d_env_index = -1;   // Set by HPAMasterNode during scene setup
+        int64_t d_env_index = -1;   // Set by VGAMasterNode during scene setup
 
         public:
             // Returned by get_episode_state() / _get_episode_state().
@@ -32,8 +32,8 @@ namespace godot {
                 TRUNCATED  = 2,  // Artificial cut: time limit, out-of-bounds guard, etc.
             };
 
-            HPAAgentNode() = default;
-            ~HPAAgentNode() = default;
+            VGAAgentNode() = default;
+            ~VGAAgentNode() = default;
 
             // --- C++ API (used by IPCController) ---
             // These route through GDVIRTUAL_CALL so GDScript overrides are invoked.
@@ -47,7 +47,7 @@ namespace godot {
             void reset();
 
             /**
-             * Set by HPAMasterNode; not exposed as a setter to GDScript.
+             * Set by VGAMasterNode; not exposed as a setter to GDScript.
              */
             void set_env_index(int64_t index);
 
@@ -73,14 +73,14 @@ namespace godot {
             static void _bind_methods();
     };
 
-    inline void HPAAgentNode::set_env_index(int64_t index) {
+    inline void VGAAgentNode::set_env_index(int64_t index) {
         d_env_index = index;
     }
 
-    inline int64_t HPAAgentNode::get_env_index() const {
+    inline int64_t VGAAgentNode::get_env_index() const {
         return d_env_index;
     }
 
 } // namespace godot
 
-VARIANT_ENUM_CAST(godot::HPAAgentNode::EpisodeState);
+VARIANT_ENUM_CAST(godot::VGAAgentNode::EpisodeState);

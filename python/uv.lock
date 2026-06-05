@@ -273,7 +273,7 @@ wheels = [
 ]
 
 [[package]]
-name = "godot-hpa"
+name = "godot-vga"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -301,8 +301,8 @@ train = [
 
 [package.metadata]
 requires-dist = [
-    { name = "godot-hpa", extras = ["gymnasium"], marker = "extra == 'dev'" },
-    { name = "godot-hpa", extras = ["gymnasium"], marker = "extra == 'train'" },
+    { name = "godot-vga", extras = ["gymnasium"], marker = "extra == 'dev'" },
+    { name = "godot-vga", extras = ["gymnasium"], marker = "extra == 'train'" },
     { name = "gymnasium", marker = "extra == 'gymnasium'" },
     { name = "matplotlib", marker = "extra == 'dev'" },
     { name = "numpy" },

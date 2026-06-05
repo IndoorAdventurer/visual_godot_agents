@@ -1,4 +1,4 @@
-extends HPAAgentNode
+extends VGAAgentNode
 
 @onready var robot: RoombaRobot = get_parent()
 

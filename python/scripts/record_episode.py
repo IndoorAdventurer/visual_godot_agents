@@ -18,7 +18,7 @@ import tyro
 sys.path.insert(0, os.path.dirname(__file__))
 from clean_rl_ppo_test import Agent
 
-from godot_hpa.gymnasium_env import GodotVectorEnv
+from godot_vga.gymnasium_env import GodotVectorEnv
 
 
 @dataclass

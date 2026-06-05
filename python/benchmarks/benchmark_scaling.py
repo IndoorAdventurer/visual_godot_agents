@@ -1,5 +1,5 @@
 """
-Scaling benchmark for HPA — measures throughput as num_envs increases.
+Scaling benchmark for VGA — measures throughput as num_envs increases.
 
 Launches and terminates a fresh Godot process for each run. Results are
 appended to a JSONL file (one record per run) so repeated invocations
@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 
 # ── Metadata helpers ───────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ def _run_single(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="HPA scaling benchmark — data collection",
+        description="VGA scaling benchmark — data collection",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--godot",    required=True, metavar="PATH",
@@ -136,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Number of independent runs per env count")
     p.add_argument("--output",  default="scaling_results.jsonl",
                    help="Output file (appended to if it already exists)")
-    p.add_argument("--name",    default="hpa",
+    p.add_argument("--name",    default="vga",
                    help="IPC name passed to Godot")
     p.add_argument("--obs-width",  type=int, default=None)
     p.add_argument("--obs-height", type=int, default=None)

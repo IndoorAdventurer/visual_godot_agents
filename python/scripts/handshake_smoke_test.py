@@ -1,18 +1,18 @@
 """
-Minimal test script: connects to a running Godot HPA environment, sends zero
+Minimal test script: connects to a running Godot VGA environment, sends zero
 actions every step, and prints rewards and done flags.
 
 Usage:
     python scripts/handshake_smoke_test.py [name]
 
-The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+The name must match the one configured in the Godot VGAMasterNode (default: vga).
 """
 
 import sys
 import numpy as np
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
-name = sys.argv[1] if len(sys.argv) > 1 else "hpa"
+name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 
 print(f"Waiting for Godot environment '{name}'...")
 

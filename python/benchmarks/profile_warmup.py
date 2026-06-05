@@ -1,5 +1,5 @@
 """
-Warmup profiler for HPA — records per-step throughput from step 0 so you can
+Warmup profiler for VGA — records per-step throughput from step 0 so you can
 identify when performance stabilises and choose a warmup value for
 benchmark_scaling.py.
 
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 
 # ── Metadata helpers (duplicated from benchmark_scaling to keep scripts self-contained) ──
@@ -109,7 +109,7 @@ def _run_profile(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="HPA warmup profiler — identify when throughput stabilises",
+        description="VGA warmup profiler — identify when throughput stabilises",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--godot",    required=True, metavar="PATH",
@@ -122,7 +122,7 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Total steps to record per run (no warmup discarded)")
     p.add_argument("--output",   default="warmup_profile.jsonl",
                    help="Output file (appended to if it already exists)")
-    p.add_argument("--name",     default="hpa",
+    p.add_argument("--name",     default="vga",
                    help="IPC name passed to Godot")
     p.add_argument("--obs-width",  type=int, default=None)
     p.add_argument("--obs-height", type=int, default=None)

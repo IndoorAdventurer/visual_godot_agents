@@ -1,4 +1,4 @@
-# High-performance Godot Agents
+# Visual Godot Agents
 **A high-performance interface between Godot and Python for Reinforcement Learning (RL) using POSIX shared memory.**
 
 ## Overview
@@ -10,9 +10,9 @@ This library is specifically designed for environments with **large observation 
 > **Note:** As this relies on POSIX shared memory, this library is currently optimized for Linux/Unix-based environments.
 
 [//]: # (TODO: expand this into a proper user manual covering:)
-[//]: # (- installation: copy addons/high_perf_agents/ into your Godot project)
-[//]: # (- usage: HPAMasterNode setup, SubViewport structure, Python startup order)
-[//]: # (- HPAAgentNode virtual method reference with guaranteed call order per step:)
+[//]: # (- installation: copy addons/visual_godot_agents/ into your Godot project)
+[//]: # (- usage: VGAMasterNode setup, SubViewport structure, Python startup order)
+[//]: # (- VGAAgentNode virtual method reference with guaranteed call order per step:)
 [//]: # (    1. _reset — called at start of exchange after a terminated/truncated episode)
 [//]: # (    2. render + visual obs readback)
 [//]: # (    3. _collect_scalar_obs)

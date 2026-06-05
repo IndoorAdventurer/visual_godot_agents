@@ -4,5 +4,5 @@
 
 using namespace godot;
 
-void initialize_high_perf_agents_module(ModuleInitializationLevel p_level);
-void uninitialize_high_perf_agents_module(ModuleInitializationLevel p_level);
+void initialize_visual_godot_agents_module(ModuleInitializationLevel p_level);
+void uninitialize_visual_godot_agents_module(ModuleInitializationLevel p_level);

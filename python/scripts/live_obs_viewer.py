@@ -1,5 +1,5 @@
 """
-Live visualization of visual observations coming from a running Godot HPA environment.
+Live visualization of visual observations coming from a running Godot VGA environment.
 
 Opens a single matplotlib window showing all N environments side-by-side,
 updated in real time as Godot produces frames.
@@ -7,7 +7,7 @@ updated in real time as Godot produces frames.
 Usage:
     python scripts/live_obs_viewer.py [name]
 
-The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+The name must match the one configured in the Godot VGAMasterNode (default: vga).
 """
 
 import sys
@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 
 def _blank_frame(h: int, w: int, c: int) -> np.ndarray:
@@ -27,7 +27,7 @@ def _blank_frame(h: int, w: int, c: int) -> np.ndarray:
     return np.zeros((h, w, min(c, 3)), dtype=np.uint8)
 
 
-name = sys.argv[1] if len(sys.argv) > 1 else "hpa"
+name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 
 print(f"Waiting for Godot environment '{name}'...")
 
@@ -48,7 +48,7 @@ with IPCClient(name) as client:
 
     plt.ion()
     fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3), squeeze=False)
-    fig.suptitle(f"HPA visual obs — {N} envs ({W}×{H}, {C}ch)")
+    fig.suptitle(f"VGA visual obs — {N} envs ({W}×{H}, {C}ch)")
 
     # Pre-create one imshow per env; hide any unused subplot slots.
     im_handles = []

@@ -4,14 +4,14 @@ extends CharacterBody3D
 const SPEED := 2.0
 const TURN_SPEED := 2.0
 
-@onready var agent := $HPAAgentNode
+@onready var agent := $VGAAgentNode
 var _human_mode := true
 
 var _spawn_pos: Vector3
 var _just_reset: bool = false
 
 func _ready() -> void:
-	_human_mode = get_tree().root.get_node_or_null("HPAMasterNode") == null
+	_human_mode = get_tree().root.get_node_or_null("VGAMasterNode") == null
 	_spawn_pos = global_position
 
 func _physics_process(delta: float) -> void:

@@ -8,15 +8,15 @@ Usage:
 Options:
     --godot-binary   Path to Godot editor binary or standalone export (required)
     --project-path   Path to the Godot project directory (omit for standalone export)
-    --num-envs       Override num_envs on HPAMasterNode (default: not set)
-    --step-rate-hz   Override step_rate_hz on HPAMasterNode (default: not set)
+    --num-envs       Override num_envs on VGAMasterNode (default: not set)
+    --step-rate-hz   Override step_rate_hz on VGAMasterNode (default: not set)
     --steps          Number of steps to run before exiting (default: 20)
     --scenario       Custom scenario arg forwarded to Godot user_args (default: test)
 """
 
 import argparse
 import numpy as np
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--godot-binary", required=True)
@@ -29,7 +29,7 @@ parser.add_argument("--steps", type=int, default=20)
 parser.add_argument("--scenario", default="test")
 args = parser.parse_args()
 
-with IPCClient("hpa") as client:
+with IPCClient("vga") as client:
     print("Launching Godot...")
     client.launch_godot(
         godot_binary=args.godot_binary,

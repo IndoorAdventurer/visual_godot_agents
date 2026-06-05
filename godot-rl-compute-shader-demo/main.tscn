@@ -2,6 +2,6 @@
 
 [ext_resource type="PackedScene" uid="uid://mxj3wjnngts8" path="res://env.tscn" id="1_ig7tw"]
 
-[node name="HPAMasterNode" type="HPAMasterNode" unique_id=827244961]
+[node name="VGAMasterNode" type="VGAMasterNode" unique_id=827244961]
 environment_scene = ExtResource("1_ig7tw")
 obs_resolution = Vector2i(512, 512)

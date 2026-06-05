@@ -14,7 +14,7 @@ Controls:
 Usage:
     python scripts/interactive_tester.py [name]
 
-The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+The name must match the one configured in the Godot VGAMasterNode (default: vga).
 """
 
 import math
@@ -24,7 +24,7 @@ import sys
 import cv2
 import numpy as np
 
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 MAX_COLS = 4
 
@@ -68,7 +68,7 @@ def _tile(frames: np.ndarray, max_cols: int = MAX_COLS) -> np.ndarray:
     return canvas
 
 
-name = sys.argv[1] if len(sys.argv) > 1 else "hpa"
+name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 print(f"Waiting for Godot environment '{name}'...")
 
 with IPCClient(name) as client:
@@ -84,7 +84,7 @@ with IPCClient(name) as client:
     step = 0
     cols = min(N, MAX_COLS)
 
-    cv2.namedWindow("HPA Demo — press key to step", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("VGA Demo — press key to step", cv2.WINDOW_NORMAL)
 
     while True:
         raw = state.visual_obs.copy()
@@ -101,11 +101,11 @@ with IPCClient(name) as client:
             cv2.putText(canvas, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX,
                         0.4, (0, 255, 0), 1, cv2.LINE_AA)
 
-        cv2.imshow("HPA Demo — press key to step", canvas)
+        cv2.imshow("VGA Demo — press key to step", canvas)
 
         key = cv2.waitKey(0) & 0xFF
 
-        if key == 27 or cv2.getWindowProperty("HPA Demo — press key to step", cv2.WND_PROP_VISIBLE) < 1:
+        if key == 27 or cv2.getWindowProperty("VGA Demo — press key to step", cv2.WND_PROP_VISIBLE) < 1:
             break
 
         forward, strafe, turn = KEY_ACTIONS.get(key, (0.0, 0.0, 0.0))

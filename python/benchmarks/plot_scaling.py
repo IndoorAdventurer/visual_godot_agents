@@ -1,5 +1,5 @@
 """
-Plotting script for HPA scaling benchmarks.
+Plotting script for VGA scaling benchmarks.
 
 Reads JSONL files produced by benchmark_scaling.py and profile_warmup.py and
 generates three figures:
@@ -326,7 +326,7 @@ def print_summary(df: pd.DataFrame) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Plot HPA scaling benchmark results",
+        description="Plot VGA scaling benchmark results",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--input", nargs="+", required=True, metavar="FILE",

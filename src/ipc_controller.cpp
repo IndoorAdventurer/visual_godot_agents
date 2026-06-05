@@ -1,6 +1,6 @@
 #include "ipc_controller.h"
-#include "hpa_agent_node.h"
-#include "hpa_profile.h"
+#include "vga_agent_node.h"
+#include "vga_profile.h"
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <cstring>
@@ -12,7 +12,7 @@ bool IPCController::initialize(
     size_t num_envs,
     Vector2i visual_res,
     uint32_t visual_channels,
-    const std::vector<HPAAgentNode *> &agents,
+    const std::vector<VGAAgentNode *> &agents,
     const std::vector<SubViewport *> &viewports
 )
 {
@@ -78,30 +78,30 @@ bool IPCController::exchange(double p_delta) {
             d_agents[i]->reset();
     }
 
-    HPA_PROFILE_PUSH("render_and_fetch");
+    VGA_PROFILE_PUSH("render_and_fetch");
     if (!_render_and_fetch(p_delta)) {
         ERR_PRINT("IPCController: GPU readback failed.");
         return false;
     }
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
-    HPA_PROFILE_PUSH("write_env_state");
+    VGA_PROFILE_PUSH("write_env_state");
     _write_env_state();
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
     // Hand over control to Python and wait for actions:
-    HPA_PROFILE_PUSH("posix_step");
+    VGA_PROFILE_PUSH("posix_step");
     d_posix.step();
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
-    HPA_PROFILE_PUSH("dispatch_actions");
+    VGA_PROFILE_PUSH("dispatch_actions");
     _dispatch_actions();
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
     return true;
 }
 
-void IPCController::set_agents(const std::vector<HPAAgentNode *> &agents) {
+void IPCController::set_agents(const std::vector<VGAAgentNode *> &agents) {
     d_agents = agents;
 }
 
@@ -132,7 +132,7 @@ void IPCController::_write_env_state() const {
     uint8_t *truncated_base   = base + d_truncated_offset;
 
     for (size_t i = 0; i != d_num_envs; ++i) {
-        HPAAgentNode *agent = d_agents[i];
+        VGAAgentNode *agent = d_agents[i];
 
         PackedByteArray obs = agent->collect_scalar_obs();
         std::memcpy(scalar_obs_base + i * d_scalar_obs_size,
@@ -141,9 +141,9 @@ void IPCController::_write_env_state() const {
         float reward = agent->get_reward();
         std::memcpy(rewards_base + i * sizeof(float), &reward, sizeof(float));
 
-        HPAAgentNode::EpisodeState state = agent->get_episode_state();
-        terminated_base[i] = (state == HPAAgentNode::TERMINATED) ? 1 : 0;
-        truncated_base[i]  = (state == HPAAgentNode::TRUNCATED)  ? 1 : 0;
+        VGAAgentNode::EpisodeState state = agent->get_episode_state();
+        terminated_base[i] = (state == VGAAgentNode::TERMINATED) ? 1 : 0;
+        truncated_base[i]  = (state == VGAAgentNode::TRUNCATED)  ? 1 : 0;
     }
 }
 

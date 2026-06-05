@@ -1,7 +1,7 @@
 """
 Verify the auto-reset mechanism end-to-end.
 
-The test environment (hpa_agent_node.gd) uses two sentinel actions:
+The test environment (vga_agent_node.gd) uses two sentinel actions:
   255 → TERMINATED (natural episode end)
   254 → TRUNCATED  (artificial episode end)
 
@@ -23,13 +23,13 @@ Test sequence (requires exactly 2 environments):
 Usage:
     python scripts/inspect_autoreset.py [name]
 
-The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+The name must match the one configured in the Godot VGAMasterNode (default: vga).
 Requires exactly 2 environments (num_envs=2 in the scene or via CLI arg).
 """
 
 import sys
 import numpy as np
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 WARM_UP_STEPS = 5
 ENV_0_NORMAL_ACTION = 3
@@ -58,7 +58,7 @@ def check(label: str, condition: bool) -> None:
         print(f"  FAIL  {label}")
 
 
-name = sys.argv[1] if len(sys.argv) > 1 else "hpa"
+name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 
 print(f"Waiting for Godot environment '{name}'...")
 

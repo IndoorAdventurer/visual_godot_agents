@@ -1,5 +1,5 @@
 #include "ipc_visuals.h"
-#include "hpa_profile.h"
+#include "vga_profile.h"
 
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_source.hpp>
@@ -109,7 +109,7 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
 bool IPCVisuals::_late_init() {
     // Resolves RS-level RIDs → RD-level RIDs. Must run after at least one
     // force_draw() so the SubViewport framebuffers exist on the render thread.
-    // HPAMasterNode::_ready() calls force_draw(false) explicitly for this purpose;
+    // VGAMasterNode::_ready() calls force_draw(false) explicitly for this purpose;
     // with render_loop_enabled = false there is no automatic frame that would
     // otherwise satisfy this requirement. Called once from fetch_frame() on first use.
     RenderingServer *rs = RenderingServer::get_singleton();
@@ -180,7 +180,7 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
             return false;
     }
 
-    HPA_PROFILE_PUSH("compute_dispatch");
+    VGA_PROFILE_PUSH("compute_dispatch");
     int64_t compute_list = d_rd->compute_list_begin();
     {
         d_rd->compute_list_bind_compute_pipeline(compute_list, d_pipeline);
@@ -210,21 +210,21 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
         }
     }
     d_rd->compute_list_end();
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
     // Profiling at 32 envs × 128×128 (see tag profiling/gpu-readback-2026-05-20):
     // GPU render fence wait ~3.4 ms, compute ~140 µs, this DMA transfer ~500 µs.
-    HPA_PROFILE_PUSH("buffer_get_data");
+    VGA_PROFILE_PUSH("buffer_get_data");
     PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
     if (static_cast<uint32_t>(data.size()) != d_buf_size) {
         ERR_PRINT("IPCVisuals: buffer_get_data returned unexpected size — skipping memcpy.");
         return false;
     }
 
-    HPA_PROFILE_PUSH("memcpy");
+    VGA_PROFILE_PUSH("memcpy");
     memcpy(dst, data.ptr(), d_buf_size);
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 
     return true;
 }

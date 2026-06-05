@@ -7,7 +7,7 @@ set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 GODOT_BINARY="/home/vincent/.local/bin/godot"
-PROJECT_PATH="/home/vincent/Documents/projects/high_performance_godot_agents/godot-rl-compute-shader-demo"
+PROJECT_PATH="/home/vincent/Documents/projects/visual_godot_agents/godot-rl-compute-shader-demo"
 NUM_ENVS=32
 NUM_INSTANCES=4
 OBS_WIDTH=64

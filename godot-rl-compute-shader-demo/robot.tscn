@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b1371033tu02y"]
 
 [ext_resource type="Script" uid="uid://bi54hmjv54sty" path="res://roombarobot.gd" id="1_3cn6f"]
-[ext_resource type="Script" uid="uid://c3adxd04ow4r1" path="res://hpa_agent_node.gd" id="2_dfm56"]
+[ext_resource type="Script" uid="uid://c3adxd04ow4r1" path="res://vga_agent_node.gd" id="2_dfm56"]
 [ext_resource type="Shader" uid="uid://b7lk6b4s5ehbd" path="res://obs_shader.gdshader" id="2_yhfw1"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_gv0v2"]
@@ -34,5 +34,5 @@ transform = Transform3D(1, 0, 0, 0, 0.97438586, 0.22488299, 0, -0.22488299, 0.97
 near = 0.3
 far = 6.0
 
-[node name="HPAAgentNode" type="HPAAgentNode" parent="." unique_id=763590916]
+[node name="VGAAgentNode" type="VGAAgentNode" parent="." unique_id=763590916]
 script = ExtResource("2_dfm56")

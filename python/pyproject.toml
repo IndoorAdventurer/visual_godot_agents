@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "godot-hpa"
+name = "godot-vga"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,18 +14,18 @@ dependencies = [
 [project.optional-dependencies]
 gymnasium = ["gymnasium"]
 dev = [
-    "godot-hpa[gymnasium]",
+    "godot-vga[gymnasium]",
     "matplotlib",
     "pyqt5",
     "pandas",
     "opencv-python",
 ]
 train = [
-    "godot-hpa[gymnasium]",
+    "godot-vga[gymnasium]",
     "torch",
     "tyro",
     "tensorboard",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["godot_hpa"]
+packages = ["godot_vga"]

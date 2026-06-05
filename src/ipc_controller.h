@@ -7,13 +7,13 @@
 
 namespace godot {
 
-    class HPAAgentNode;
+    class VGAAgentNode;
 
      /**
       * Responsible for getting data to and from shared memory, and all
       * synchronization involved. This includes:
       * - Semaphore synchronization with Python
-      * - Interacting with HPAAgentNodes
+      * - Interacting with VGAAgentNodes
       * - Offloading visual input from the GPU
       */
     class IPCController {
@@ -44,7 +44,7 @@ namespace godot {
         uint32_t d_visual_width   = 0;
         uint32_t d_visual_height  = 0;
         uint32_t d_visual_channels = 0;
-        std::vector<HPAAgentNode *> d_agents;
+        std::vector<VGAAgentNode *> d_agents;
 
         // Byte offsets into shared memory, fixed after initialize():
         size_t d_visual_obs_offset   = 0;
@@ -73,7 +73,7 @@ namespace godot {
              * @param num_envs          Number of parallel environments.
              * @param visual_res        The resolution of visual outputs
              * @param visual_channels   Output channels per pixel (1–4).
-             * @param agents            One HPAAgentNode* per environment, in env order.
+             * @param agents            One VGAAgentNode* per environment, in env order.
              * @param viewports         One subviewport per environment
              */
             bool initialize(
@@ -81,7 +81,7 @@ namespace godot {
                 size_t num_envs,
                 Vector2i visual_res,
                 uint32_t visual_channels,
-                const std::vector<HPAAgentNode *> &agents,
+                const std::vector<VGAAgentNode *> &agents,
                 const std::vector<SubViewport *> &viewports
             );
 
@@ -100,7 +100,7 @@ namespace godot {
              * Replaces the stored agent pointers after an environment reset that
              * recreates agent nodes. Sizes must be unchanged from initialize().
              */
-            void set_agents(const std::vector<HPAAgentNode *> &agents);
+            void set_agents(const std::vector<VGAAgentNode *> &agents);
 
         private:
             /**

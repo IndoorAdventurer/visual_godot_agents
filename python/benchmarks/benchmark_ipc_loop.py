@@ -1,5 +1,5 @@
 """
-Benchmark script for the HPA event loop.
+Benchmark script for the VGA event loop.
 
 Measures per-step wall-clock latency with a no-op policy and reports a full
 distribution summary. Run before and after the event loop decoupling
@@ -24,13 +24,13 @@ import argparse
 import time
 import sys
 import numpy as np
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
-parser = argparse.ArgumentParser(description="HPA event loop benchmark")
-parser.add_argument("--name",          default="hpa",  help="IPC name (default: hpa)")
+parser = argparse.ArgumentParser(description="VGA event loop benchmark")
+parser.add_argument("--name",          default="vga",  help="IPC name (default: vga)")
 parser.add_argument("--steps",         type=int, default=500,
                     help="Number of steps to measure (default: 500)")
 parser.add_argument("--warmup",        type=int, default=10,

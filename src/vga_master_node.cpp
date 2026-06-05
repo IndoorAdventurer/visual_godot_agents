@@ -1,5 +1,5 @@
-#include "hpa_master_node.h"
-#include "hpa_profile.h"
+#include "vga_master_node.h"
+#include "vga_profile.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -12,17 +12,17 @@
 
 using namespace godot;
 
-HPAMasterNode::HPAMasterNode()
+VGAMasterNode::VGAMasterNode()
 :
     d_env_scene(),
     d_num_envs(2),
     d_obs_res(128, 128),
-    d_ipc_name("hpa"),
+    d_ipc_name("vga"),
     d_step_rate_hz(60),
     d_initialized(false)
 {}
 
-void HPAMasterNode::_ready() {
+void VGAMasterNode::_ready() {
     if (Engine::get_singleton()->is_editor_hint())
         return;
 
@@ -30,10 +30,10 @@ void HPAMasterNode::_ready() {
     _configure_sim_loop();
 
     std::vector<SubViewport *> subviewports = _init_envs();
-    std::vector<HPAAgentNode *> agents = _collect_agents();
+    std::vector<VGAAgentNode *> agents = _collect_agents();
 
     if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
-        ERR_PRINT("HPAMasterNode: IPCController initialization failed. Quitting.");
+        ERR_PRINT("VGAMasterNode: IPCController initialization failed. Quitting.");
         get_tree()->quit();
         return;
     }
@@ -47,20 +47,20 @@ void HPAMasterNode::_ready() {
     d_initialized = true;
 }
 
-void HPAMasterNode::_physics_process(double p_delta) {
+void VGAMasterNode::_physics_process(double p_delta) {
     if (Engine::get_singleton()->is_editor_hint() || !d_initialized)
         return;
-    HPA_PROFILE_RANGE("HPAMasterNode::_physics_process");
+    VGA_PROFILE_RANGE("VGAMasterNode::_physics_process");
 
-    HPA_PROFILE_PUSH("exchange");
+    VGA_PROFILE_PUSH("exchange");
     if (!d_ipc.exchange(p_delta)) {
-        ERR_PRINT("HPAMasterNode: exchange failed. Quitting.");
+        ERR_PRINT("VGAMasterNode: exchange failed. Quitting.");
         get_tree()->quit();
     }
-    HPA_PROFILE_POP();
+    VGA_PROFILE_POP();
 }
 
-PackedStringArray HPAMasterNode::_get_configuration_warnings() const {
+PackedStringArray VGAMasterNode::_get_configuration_warnings() const {
     PackedStringArray warnings = Node::_get_configuration_warnings();
     if (d_env_scene.is_null())
         warnings.push_back(
@@ -75,59 +75,59 @@ PackedStringArray HPAMasterNode::_get_configuration_warnings() const {
     return warnings;
 }
 
-void HPAMasterNode::set_env_scene(const Ref<PackedScene> p_scene) {
+void VGAMasterNode::set_env_scene(const Ref<PackedScene> p_scene) {
     d_env_scene = p_scene;
     update_configuration_warnings();
 }
 
-Ref<PackedScene> HPAMasterNode::get_env_scene() const {
+Ref<PackedScene> VGAMasterNode::get_env_scene() const {
     return d_env_scene;
 }
 
-void HPAMasterNode::set_num_envs(int p_num) {
+void VGAMasterNode::set_num_envs(int p_num) {
     d_num_envs = p_num;
     update_configuration_warnings();
 }
 
-int HPAMasterNode::get_num_envs() const {
+int VGAMasterNode::get_num_envs() const {
     return d_num_envs;
 }
 
-void HPAMasterNode::set_obs_res(Vector2i p_res) {
+void VGAMasterNode::set_obs_res(Vector2i p_res) {
     d_obs_res = p_res;
     update_configuration_warnings();
 }
 
-Vector2i HPAMasterNode::get_obs_res() const {
+Vector2i VGAMasterNode::get_obs_res() const {
     return d_obs_res;
 }
 
-void HPAMasterNode::set_ipc_name(const String &p_name) {
+void VGAMasterNode::set_ipc_name(const String &p_name) {
     d_ipc_name = p_name;
 }
 
-String HPAMasterNode::get_ipc_name() const {
+String VGAMasterNode::get_ipc_name() const {
     return d_ipc_name;
 }
 
-void HPAMasterNode::set_step_rate_hz(int p_hz) {
+void VGAMasterNode::set_step_rate_hz(int p_hz) {
     d_step_rate_hz = p_hz;
 }
 
-int HPAMasterNode::get_step_rate_hz() const {
+int VGAMasterNode::get_step_rate_hz() const {
     return d_step_rate_hz;
 }
 
-Dictionary HPAMasterNode::get_user_args() const {
+Dictionary VGAMasterNode::get_user_args() const {
     return d_user_args;
 }
 
-void HPAMasterNode::_bind_methods() {
+void VGAMasterNode::_bind_methods() {
     // Environment scene property:
     ClassDB::bind_method(
-        D_METHOD("set_env_scene", "p_scene"), &HPAMasterNode::set_env_scene);
+        D_METHOD("set_env_scene", "p_scene"), &VGAMasterNode::set_env_scene);
     ClassDB::bind_method(
-        D_METHOD("get_env_scene"), &HPAMasterNode::get_env_scene);
+        D_METHOD("get_env_scene"), &VGAMasterNode::get_env_scene);
     ADD_PROPERTY(
         PropertyInfo(
             Variant::OBJECT,
@@ -138,9 +138,9 @@ void HPAMasterNode::_bind_methods() {
 
     // Number of environments property:
     ClassDB::bind_method(
-        D_METHOD("set_num_envs", "p_num"), &HPAMasterNode::set_num_envs);
+        D_METHOD("set_num_envs", "p_num"), &VGAMasterNode::set_num_envs);
     ClassDB::bind_method(
-        D_METHOD("get_num_envs"), &HPAMasterNode::get_num_envs);
+        D_METHOD("get_num_envs"), &VGAMasterNode::get_num_envs);
     ADD_PROPERTY(
         PropertyInfo(
             Variant::INT,
@@ -151,9 +151,9 @@ void HPAMasterNode::_bind_methods() {
 
     // Screen resolution:
     ClassDB::bind_method(
-        D_METHOD("set_obs_res", "p_res"), &HPAMasterNode::set_obs_res);
+        D_METHOD("set_obs_res", "p_res"), &VGAMasterNode::set_obs_res);
     ClassDB::bind_method(
-        D_METHOD("get_obs_res"), &HPAMasterNode::get_obs_res);
+        D_METHOD("get_obs_res"), &VGAMasterNode::get_obs_res);
     ADD_PROPERTY(
         PropertyInfo(
             Variant::VECTOR2I, "obs_resolution"),
@@ -161,28 +161,28 @@ void HPAMasterNode::_bind_methods() {
 
     // IPC name:
     ClassDB::bind_method(
-        D_METHOD("set_ipc_name", "p_name"), &HPAMasterNode::set_ipc_name);
+        D_METHOD("set_ipc_name", "p_name"), &VGAMasterNode::set_ipc_name);
     ClassDB::bind_method(
-        D_METHOD("get_ipc_name"), &HPAMasterNode::get_ipc_name);
+        D_METHOD("get_ipc_name"), &VGAMasterNode::get_ipc_name);
     ADD_PROPERTY(
         PropertyInfo(Variant::STRING, "ipc_name"),
         "set_ipc_name", "get_ipc_name");
 
-    // User-defined cmdline args (everything after -- not consumed by HPAMasterNode):
+    // User-defined cmdline args (everything after -- not consumed by VGAMasterNode):
     ClassDB::bind_method(
-        D_METHOD("get_user_args"), &HPAMasterNode::get_user_args);
+        D_METHOD("get_user_args"), &VGAMasterNode::get_user_args);
 
     // Step rate:
     ClassDB::bind_method(
-        D_METHOD("set_step_rate_hz", "p_hz"), &HPAMasterNode::set_step_rate_hz);
+        D_METHOD("set_step_rate_hz", "p_hz"), &VGAMasterNode::set_step_rate_hz);
     ClassDB::bind_method(
-        D_METHOD("get_step_rate_hz"), &HPAMasterNode::get_step_rate_hz);
+        D_METHOD("get_step_rate_hz"), &VGAMasterNode::get_step_rate_hz);
     ADD_PROPERTY(
         PropertyInfo(Variant::INT, "step_rate_hz", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"),
         "set_step_rate_hz", "get_step_rate_hz");
 }
 
-void HPAMasterNode::_apply_cmdline_args() {
+void VGAMasterNode::_apply_cmdline_args() {
     PackedStringArray args = OS::get_singleton()->get_cmdline_user_args();
     for (int i = 0; i < args.size(); ++i) {
         const String &arg = args[i];
@@ -201,7 +201,7 @@ void HPAMasterNode::_apply_cmdline_args() {
     }
 }
 
-void HPAMasterNode::_configure_sim_loop() {
+void VGAMasterNode::_configure_sim_loop() {
     Engine *engine = Engine::get_singleton();
     // Physics step must be much smaller than one main-loop iteration so the
     // accumulator fires on every iteration. time_scale keeps the reported delta at 1/step_rate_hz.
@@ -216,7 +216,7 @@ void HPAMasterNode::_configure_sim_loop() {
     // Belt-and-braces: assert the default; a project setting could override it.
     ERR_FAIL_COND_MSG(
         OS::get_singleton()->is_in_low_processor_usage_mode(),
-        "HPAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
+        "VGAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
         "iterations and break the sim-loop. Disable it in Project Settings.");
 
     DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
@@ -227,7 +227,7 @@ void HPAMasterNode::_configure_sim_loop() {
     RenderingServer::get_singleton()->set_render_loop_enabled(false);
 }
 
-std::vector<SubViewport *> HPAMasterNode::_init_envs() {
+std::vector<SubViewport *> VGAMasterNode::_init_envs() {
     std::vector<SubViewport *> viewports;
     if (d_env_scene.is_null())
         return viewports;
@@ -250,19 +250,19 @@ std::vector<SubViewport *> HPAMasterNode::_init_envs() {
     return viewports;
 }
 
-std::vector<HPAAgentNode *> HPAMasterNode::_collect_agents() {
-    std::vector<HPAAgentNode *> agents;
+std::vector<VGAAgentNode *> VGAMasterNode::_collect_agents() {
+    std::vector<VGAAgentNode *> agents;
     int child_count = get_child_count();
     for (int i = 0; i != child_count; ++i) {
         SubViewport *sv = Object::cast_to<SubViewport>(get_child(i));
         if (!sv)
             continue;
-        TypedArray<Node> found = sv->find_children("*", "HPAAgentNode", true, false);
+        TypedArray<Node> found = sv->find_children("*", "VGAAgentNode", true, false);
         if (found.is_empty()) {
-            ERR_PRINT("HPAMasterNode: no HPAAgentNode found in environment scene.");
+            ERR_PRINT("VGAMasterNode: no VGAAgentNode found in environment scene.");
             continue;
         }
-        HPAAgentNode *agent = Object::cast_to<HPAAgentNode>(found[0]);
+        VGAAgentNode *agent = Object::cast_to<VGAAgentNode>(found[0]);
         // Giving each agent its own index so it can be used, for example
         // to give each environment a unique random seed later on:
         agent->set_env_index(static_cast<int64_t>(agents.size()));

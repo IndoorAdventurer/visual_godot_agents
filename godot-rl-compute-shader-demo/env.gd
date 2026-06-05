@@ -1,7 +1,7 @@
 extends Node3D
 
 @onready var robot := $Robot
-@onready var agent := $Robot/HPAAgentNode
+@onready var agent := $Robot/VGAAgentNode
 @onready var dirt_sys := $World/DirtSystem
 @onready var trail_sys := $World/StaticBody3D/MeshInstance3D
 

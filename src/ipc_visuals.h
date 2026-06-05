@@ -66,7 +66,7 @@ namespace godot {
              * The remainder of setup (resolving viewport → texture → RD-level
              * texture RIDs, building the uniform set) is deferred to the first
              * fetch_frame() call via _late_init(), by which point force_draw()
-             * has run. HPAMasterNode::_ready() calls force_draw(false) explicitly
+             * has run. VGAMasterNode::_ready() calls force_draw(false) explicitly
              * to satisfy this; with render_loop_enabled = false no automatic frame
              * would otherwise do so.
              *

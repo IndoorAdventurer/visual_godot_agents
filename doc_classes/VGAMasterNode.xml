@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="HPAMasterNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="VGAMasterNode" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-	Root node for the high-performance agents plugin. Place one in your main scene.
+	Root node for the Visual Godot Agents plugin. Place one in your main scene.
 	</brief_description>
 	<description>
 		Runs [member num_envs] parallel instances of [member environment_scene] in separate SubViewports, and synchronizes observations and actions with a Python training process via POSIX shared memory and semaphores. The shared memory region and semaphores are identified by [member ipc_name].
-		On [method Node._ready], the node initializes the environments and the IPC transport, and quits the application if initialization fails. Each physics step, [method Node._physics_process] automatically writes observations into shared memory, signals Python, blocks until Python responds with actions, and dispatches those actions to each environment's [HPAAgentNode].
-		Your environment scene must contain exactly one [HPAAgentNode] subclass. The Python process must create the semaphores and open the shared memory region using the same [member ipc_name] before Godot starts.
+		On [method Node._ready], the node initializes the environments and the IPC transport, and quits the application if initialization fails. Each physics step, [method Node._physics_process] automatically writes observations into shared memory, signals Python, blocks until Python responds with actions, and dispatches those actions to each environment's [VGAAgentNode].
+		Your environment scene must contain exactly one [VGAAgentNode] subclass. The Python process must create the semaphores and open the shared memory region using the same [member ipc_name] before Godot starts.
 	</description>
 	<methods>
 		<method name="get_user_args" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [HPAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], and [code]step_rate_hz[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
+				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [VGAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], and [code]step_rate_hz[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
 				[codeblock]
-				var args = $HPAMasterNode.get_user_args()
+				var args = $VGAMasterNode.get_user_args()
 				var scenario = args.get("scenario", "id")
 				[/codeblock]
 			</description>
@@ -22,7 +22,7 @@
 	</methods>
 	<members>
 		<member name="environment_scene" type="PackedScene" setter="set_env_scene" getter="get_env_scene">
-			The scene representing one environment instance. Must contain exactly one [HPAAgentNode] subclass. One instance is created per parallel environment.
+			The scene representing one environment instance. Must contain exactly one [VGAAgentNode] subclass. One instance is created per parallel environment.
 		</member>
 		<member name="num_envs" type="int" setter="set_num_envs" getter="get_num_envs" default="2">
 			Number of parallel environment instances to run.
@@ -30,7 +30,7 @@
 		<member name="obs_resolution" type="Vector2i" setter="set_obs_res" getter="get_obs_res" default="Vector2i(128, 128)">
 			Width and height of the visual observation rendered by each SubViewport. Determines the size of the visual observation block in shared memory.
 		</member>
-		<member name="ipc_name" type="String" setter="set_ipc_name" getter="get_ipc_name" default="&quot;hpa&quot;">
+		<member name="ipc_name" type="String" setter="set_ipc_name" getter="get_ipc_name" default="&quot;vga&quot;">
 			Identifier used to name the POSIX shared memory region ([code]/[ipc_name][/code]) and semaphores ([code]/[ipc_name]_env_ready[/code], [code]/[ipc_name]_act_ready[/code]). Must match the name used on the Python side.
 		</member>
 		<member name="step_rate_hz" type="int" setter="set_step_rate_hz" getter="get_step_rate_hz" default="60">

@@ -36,7 +36,7 @@ Particle positions live entirely on the GPU in an SSBO after initialisation:
   GPU buffer — no CPU round-trip.
 - **Reward readback**: an atomic counter in the SSBO tracks particles collected
   this step. It is read back via `buffer_get_data` in the `post_draw` hook on
-  HPAAgentNode, after the draw commands have flushed.
+  VGAAgentNode, after the draw commands have flushed.
 
 ## Scene Structure
 
@@ -48,7 +48,7 @@ robot.tscn
   ├── CollisionShape3D
   ├── MeshInstance3D     (cylinder)
   ├── Camera3D           (fixed local offset: behind + above)
-  └── HPAAgentNode       (RoombaAgent.gd — obs/reward/action overrides)
+  └── VGAAgentNode       (RoombaAgent.gd — obs/reward/action overrides)
 
 world.tscn
   Node3D                 (World.gd)
@@ -72,8 +72,8 @@ upward via signals from robot/world to `Env.gd`.
 ## Human vs Agent Mode
 
 `env.tscn` works in both modes:
-- **Human mode**: run `env.tscn` directly (no HPAMasterNode in the tree).
-  `RoombaRobot.gd` checks at `_ready` whether an HPAMasterNode exists at the
+- **Human mode**: run `env.tscn` directly (no VGAMasterNode in the tree).
+  `RoombaRobot.gd` checks at `_ready` whether an VGAMasterNode exists at the
   tree root; if not, it reads keyboard input each `_physics_process`.
-- **Agent mode**: `env.tscn` is instantiated inside an HPAMasterNode SubViewport
+- **Agent mode**: `env.tscn` is instantiated inside an VGAMasterNode SubViewport
   as usual. Actions arrive via `RoombaAgent._set_action()`.

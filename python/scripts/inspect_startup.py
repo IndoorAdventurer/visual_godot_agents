@@ -1,5 +1,5 @@
 """
-Capture the first N_FRAMES frames from a running Godot HPA environment and plot
+Capture the first N_FRAMES frames from a running Godot VGA environment and plot
 them in a grid: rows = frames (0 = frame returned by connect()), columns = envs.
 
 Each environment receives a distinct cycling action sequence (env e gets action
@@ -12,7 +12,7 @@ the expected value (sent_action + 10.0). Only mismatches are printed.
 Usage:
     python scripts/inspect_startup.py [name]
 
-The name must match the one configured in the Godot HPAMasterNode (default: hpa).
+The name must match the one configured in the Godot VGAMasterNode (default: vga).
 """
 
 import sys
@@ -20,7 +20,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from godot_hpa.ipc_client import IPCClient
+from godot_vga.ipc_client import IPCClient
 
 # How many frames to capture (frame 0 = returned by connect()).
 N_FRAMES = 15
@@ -41,7 +41,7 @@ def extract_display(frame: np.ndarray, channels: int) -> np.ndarray:
     return frame
 
 
-name = sys.argv[1] if len(sys.argv) > 1 else "hpa"
+name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 
 print(f"Waiting for Godot environment '{name}'...")
 

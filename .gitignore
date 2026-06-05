@@ -10,7 +10,7 @@
 src/gen/
 
 # Excluding the test projects:
-high-performance-godot-agents/
+ipc-test-env/
 # godot-rl-compute-shader-demo/
 
 # Brainstorming/design notes:
