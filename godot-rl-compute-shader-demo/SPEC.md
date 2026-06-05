@@ -15,7 +15,7 @@ the following distribution (decided per episode):
   the other
 
 The robot gets a reward for each particle it collects and a penalty for falling
-off the plane. The episode truncates after N steps; it terminates early when all
+off the plane. The episode truncates after 1500 steps; it terminates early when all
 particles are collected or the robot falls off.
 
 Observations: three visual channels — R: depth, G: dirt-particle mask, B: robot

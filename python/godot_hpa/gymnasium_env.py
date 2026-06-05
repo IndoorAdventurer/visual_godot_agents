@@ -15,6 +15,7 @@ Discrete          — single uint8; action_size must equal 1
 import numpy as np
 import gymnasium
 import gymnasium.spaces.utils as gym_utils
+from gymnasium.vector.utils import batch_space
 from typing import Any
 
 from .multi_ipc_client import MultiIPCClient
@@ -46,7 +47,13 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         step_rate_hz: int | None = None,
         extra_args: dict[str, str] | None = None,
     ):
-        super().__init__(num_envs, observation_space, action_space)
+        # gymnasium 1.x VectorEnv.__init__ takes no args; set required attributes directly.
+        super().__init__()
+        self.num_envs = num_envs
+        self.single_observation_space = observation_space
+        self.single_action_space = action_space
+        self.observation_space = batch_space(observation_space, num_envs)
+        self.action_space = batch_space(action_space, num_envs)
 
         self._include_scalar_obs = include_scalar_obs
         self._action_dtype, self._action_flat_dim = _parse_action_space(action_space)
@@ -133,9 +140,9 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
 
         # Visual obs
         visual_space = (
-            self.observation_space["visual"]
+            self.single_observation_space["visual"]
             if self._include_scalar_obs
-            else self.observation_space
+            else self.single_observation_space
         )
         expected_visual = (c.visual_height, c.visual_width, c.visual_channels)
         if visual_space.shape != expected_visual:
@@ -146,7 +153,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
 
         # Scalar obs (optional)
         if self._include_scalar_obs:
-            scalar_space = self.observation_space["scalar"]
+            scalar_space = self.single_observation_space["scalar"]
             if scalar_space.shape[0] != c.scalar_obs_size:
                 raise ValueError(
                     f"scalar obs size mismatch: space has {scalar_space.shape[0]}, "

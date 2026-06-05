@@ -3,8 +3,10 @@
 
 # C++/Scons/Godot stuff:
 *.out
+*.so
 *.os
 *.dblite
+*.x86_64
 src/gen/
 
 # Excluding the test projects:
@@ -23,7 +25,10 @@ __pycache__/
 python/**/*.jsonl
 python/**/*.qdstrm
 python/**/*.nsys-rep
+python/runs/
 
 # Images:
 *.png
 *.svg
+*.mp4
+*.gif

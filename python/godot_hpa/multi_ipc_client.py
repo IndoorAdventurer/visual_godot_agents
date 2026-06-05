@@ -11,6 +11,7 @@ each call so callers own the returned arrays and can store them safely without a
 extra copy.
 """
 
+import atexit
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
@@ -57,6 +58,7 @@ class MultiIPCClient:
             self._shards = [IPCClient(f"{name}_{i}") for i in range(num_instances)]
 
         self._executor: ThreadPoolExecutor | None = None
+        atexit.register(self.close)
 
         # Layout — populated on connect().
         self.num_envs        = num_envs

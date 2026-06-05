@@ -14,10 +14,17 @@ dependencies = [
 [project.optional-dependencies]
 gymnasium = ["gymnasium"]
 dev = [
+    "godot-hpa[gymnasium]",
     "matplotlib",
     "pyqt5",
     "pandas",
-    "opencv-python"
+    "opencv-python",
+]
+train = [
+    "godot-hpa[gymnasium]",
+    "torch",
+    "tyro",
+    "tensorboard",
 ]
 
 [tool.hatch.build.targets.wheel]

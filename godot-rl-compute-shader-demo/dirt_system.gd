@@ -113,7 +113,7 @@ func get_total_collected() -> int:
 
 func _multimesh_stuff() -> void:
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(0.04, 0.04)
+	pm.size = Vector2(0.08, 0.08)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://obs_shader.gdshader")
 	mat.set_shader_parameter("dirt_mask", 1.0)
