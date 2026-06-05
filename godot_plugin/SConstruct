@@ -41,7 +41,7 @@ lib_filename = "{}visual_godot_agents{}{}".format(env.subst('$SHLIBPREFIX'), env
 
 # Creates a SCons target for the path with our sources.
 library = env.SharedLibrary(
-    "ipc-test-env/bin/{}".format(lib_filename),
+    "addons/visual_godot_agents/bin/{}".format(lib_filename),
     source=sources,
 )
 

@@ -9,6 +9,16 @@ This library is specifically designed for environments with **large observation 
 
 > **Note:** As this relies on POSIX shared memory, this library is currently optimized for Linux/Unix-based environments.
 
+## Repository structure
+
+```
+godot_plugin/       GDExtension C++ source and build system
+python_package/     Python client package (py_vga) + benchmarks
+example_projects/
+  roomba_demo/      Roomba cleaning demo: Godot project + training scripts
+  ipc_test_env/     Minimal IPC test environment
+```
+
 [//]: # (TODO: expand this into a proper user manual covering:)
 [//]: # (- installation: copy addons/visual_godot_agents/ into your Godot project)
 [//]: # (- usage: VGAMasterNode setup, SubViewport structure, Python startup order)

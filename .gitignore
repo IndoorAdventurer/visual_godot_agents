@@ -7,11 +7,10 @@
 *.os
 *.dblite
 *.x86_64
-src/gen/
+godot_plugin/src/gen/
 
-# Excluding the test projects:
-ipc-test-env/
-# godot-rl-compute-shader-demo/
+# Godot project is untracked until cleaned up; scripts alongside it are tracked:
+example_projects/ipc_test_env/godot_project/
 
 # Brainstorming/design notes:
 design/
@@ -22,10 +21,10 @@ __pycache__/
 .venv/
 
 # Results of experiments:
-python/**/*.jsonl
-python/**/*.qdstrm
-python/**/*.nsys-rep
-python/runs/
+python_package/**/*.jsonl
+python_package/**/*.qdstrm
+python_package/**/*.nsys-rep
+python_package/runs/
 
 # Images:
 *.png

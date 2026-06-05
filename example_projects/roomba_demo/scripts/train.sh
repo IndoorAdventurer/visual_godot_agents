@@ -5,9 +5,11 @@
 # point GODOT_BINARY / PROJECT_PATH at the exported release binary.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ── Configuration ─────────────────────────────────────────────────────────────
-GODOT_BINARY="/home/vincent/.local/bin/godot"
-PROJECT_PATH="/home/vincent/Documents/projects/visual_godot_agents/godot-rl-compute-shader-demo"
+GODOT_BINARY="${GODOT_BINARY:-$(command -v godot)}"
+PROJECT_PATH="$SCRIPT_DIR/../godot_project"
 NUM_ENVS=32
 NUM_INSTANCES=4
 OBS_WIDTH=64
@@ -35,8 +37,7 @@ trap "echo 'Cleaning up Xvfb...'; kill $XVFB_PID 2>/dev/null || true" EXIT
 sleep 1
 
 # ── Training ──────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."   # run from python/ so uv picks up pyproject.toml
+cd "$SCRIPT_DIR/.."   # run from roomba_demo/ so uv picks up pyproject.toml
 
 EXTRA_ARGS=""
 if [[ -n "$RESUME_FROM" ]]; then

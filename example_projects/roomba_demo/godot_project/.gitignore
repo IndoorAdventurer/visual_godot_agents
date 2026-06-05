@@ -1,0 +1,5 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Compiled extension binaries are covered by root .gitignore (*.so)

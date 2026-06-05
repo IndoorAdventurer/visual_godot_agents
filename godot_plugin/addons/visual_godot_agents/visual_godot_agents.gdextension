@@ -1,0 +1,11 @@
+[configuration]
+
+entry_symbol = "visual_godot_agents_library_init"
+compatibility_minimum = "4.5"
+reloadable = true
+
+[libraries]
+
+linux.editor.x86_64 = "bin/libvisual_godot_agents.linux.editor.x86_64.so"
+linux.debug.x86_64 = "bin/libvisual_godot_agents.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "bin/libvisual_godot_agents.linux.template_release.x86_64.so"

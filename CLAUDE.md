@@ -6,10 +6,11 @@ in Godot, communicates observations/actions to Python via POSIX shared memory an
 ## Build
 
 ```bash
+cd godot_plugin
 uv tool run scons [scons arguments...]
 ```
 
-All `.cpp` files in `src/` are compiled automatically. Generated files go to `src/gen/`.
+All `.cpp` files in `godot_plugin/src/` are compiled automatically. Generated files go to `godot_plugin/src/gen/`.
 
 ## Architecture (current)
 
@@ -38,12 +39,16 @@ in default (idle) process mode will all expire immediately.
 Visual observations are read back from each SubViewport's GPU texture and written directly
 into the shared memory visual block by `IPCVisuals::fetch_frame()`.
 
-Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `src/register_types.cpp` and
-XML documentation in `doc_classes/`. Internal C++ components need neither.
+Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `godot_plugin/src/register_types.cpp` and
+XML documentation in `godot_plugin/doc_classes/`. Internal C++ components need neither.
 
-**Python** (`python/` — install with `uv sync` from that directory)
+**Python** (`python_package/` — install with `uv sync` from that directory)
 - `py_vga/` — Python package; `IPCClient` is the low-level IPC primitive
-- `scripts/` — utility and test scripts
+- `benchmarks/` — IPC-layer benchmarks (latency, scaling, warmup profiling)
+
+**Example projects** (`example_projects/`)
+- `roomba_demo/` — Roomba cleaning demo; `godot_project/` is the Godot project, `scripts/` holds PPO training (`clean_rl_ppo_test.py`, `train.sh`), interactive testing, and episode recording. The symlink `godot_project/addons/visual_godot_agents` points to `godot_plugin/addons/visual_godot_agents`.
+- `ipc_test_env/` — Minimal environment for validating the IPC layer; `godot_project/` is gitignored (work in progress), `scripts/` holds `launch_smoke_test.py`, `inspect_autoreset.py`, and `inspect_startup.py`.
 
 **Startup order**: Python must start first — it creates the semaphores and blocks on `env_ready`.
 Godot then opens the semaphores, creates shared memory, and posts `env_ready`. Python opens the
