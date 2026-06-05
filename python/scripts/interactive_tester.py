@@ -24,7 +24,7 @@ import sys
 import cv2
 import numpy as np
 
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 MAX_COLS = 4
 

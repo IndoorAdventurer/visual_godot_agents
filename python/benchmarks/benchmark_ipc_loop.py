@@ -24,7 +24,7 @@ import argparse
 import time
 import sys
 import numpy as np
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

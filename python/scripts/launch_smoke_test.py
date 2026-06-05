@@ -16,7 +16,7 @@ Options:
 
 import argparse
 import numpy as np
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--godot-binary", required=True)

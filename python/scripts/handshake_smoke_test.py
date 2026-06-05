@@ -10,7 +10,7 @@ The name must match the one configured in the Godot VGAMasterNode (default: vga)
 
 import sys
 import numpy as np
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 

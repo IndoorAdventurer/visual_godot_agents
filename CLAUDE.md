@@ -42,7 +42,7 @@ Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `src/register_typ
 XML documentation in `doc_classes/`. Internal C++ components need neither.
 
 **Python** (`python/` — install with `uv sync` from that directory)
-- `godot_vga/` — Python package; `IPCClient` is the low-level IPC primitive
+- `py_vga/` — Python package; `IPCClient` is the low-level IPC primitive
 - `scripts/` — utility and test scripts
 
 **Startup order**: Python must start first — it creates the semaphores and blocks on `env_ready`.

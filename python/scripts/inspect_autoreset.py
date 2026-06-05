@@ -29,7 +29,7 @@ Requires exactly 2 environments (num_envs=2 in the scene or via CLI arg).
 
 import sys
 import numpy as np
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 WARM_UP_STEPS = 5
 ENV_0_NORMAL_ACTION = 3

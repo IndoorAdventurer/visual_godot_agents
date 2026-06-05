@@ -273,50 +273,6 @@ wheels = [
 ]
 
 [[package]]
-name = "godot-vga"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-    { name = "posix-ipc" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "gymnasium" },
-    { name = "matplotlib" },
-    { name = "opencv-python" },
-    { name = "pandas" },
-    { name = "pyqt5" },
-]
-gymnasium = [
-    { name = "gymnasium" },
-]
-train = [
-    { name = "gymnasium" },
-    { name = "tensorboard" },
-    { name = "torch" },
-    { name = "tyro" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "godot-vga", extras = ["gymnasium"], marker = "extra == 'dev'" },
-    { name = "godot-vga", extras = ["gymnasium"], marker = "extra == 'train'" },
-    { name = "gymnasium", marker = "extra == 'gymnasium'" },
-    { name = "matplotlib", marker = "extra == 'dev'" },
-    { name = "numpy" },
-    { name = "opencv-python", marker = "extra == 'dev'" },
-    { name = "pandas", marker = "extra == 'dev'" },
-    { name = "posix-ipc" },
-    { name = "pyqt5", marker = "extra == 'dev'" },
-    { name = "tensorboard", marker = "extra == 'train'" },
-    { name = "torch", marker = "extra == 'train'" },
-    { name = "tyro", marker = "extra == 'train'" },
-]
-provides-extras = ["gymnasium", "dev", "train"]
-
-[[package]]
 name = "grpcio"
 version = "1.81.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1121,6 +1077,50 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/ab/547fbd9e16d879dd13c167478f8ae0a83a428008ca07a5e06acdc23ad473/protobuf-7.35.0-cp310-abi3-win_amd64.whl", hash = "sha256:f05bcadf9a2a6b8dda047007075135fb7d08c73d9177aabc067e1be46881a201", size = 439996, upload-time = "2026-05-19T23:02:26.808Z" },
     { url = "https://files.pythonhosted.org/packages/b8/ef/50433d346c56657a70d27f156c7b349ac59a068b01de4eb796e747eecc43/protobuf-7.35.0-py3-none-any.whl", hash = "sha256:c13f325cf242bad135c350629eeb5d54b24228eb472fb3e2e9ebbd4c5dc20ca0", size = 171659, upload-time = "2026-05-19T23:02:27.842Z" },
 ]
+
+[[package]]
+name = "py-vga"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "numpy" },
+    { name = "posix-ipc" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "gymnasium" },
+    { name = "matplotlib" },
+    { name = "opencv-python" },
+    { name = "pandas" },
+    { name = "pyqt5" },
+]
+gymnasium = [
+    { name = "gymnasium" },
+]
+train = [
+    { name = "gymnasium" },
+    { name = "tensorboard" },
+    { name = "torch" },
+    { name = "tyro" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "gymnasium", marker = "extra == 'gymnasium'" },
+    { name = "matplotlib", marker = "extra == 'dev'" },
+    { name = "numpy" },
+    { name = "opencv-python", marker = "extra == 'dev'" },
+    { name = "pandas", marker = "extra == 'dev'" },
+    { name = "posix-ipc" },
+    { name = "py-vga", extras = ["gymnasium"], marker = "extra == 'dev'" },
+    { name = "py-vga", extras = ["gymnasium"], marker = "extra == 'train'" },
+    { name = "pyqt5", marker = "extra == 'dev'" },
+    { name = "tensorboard", marker = "extra == 'train'" },
+    { name = "torch", marker = "extra == 'train'" },
+    { name = "tyro", marker = "extra == 'train'" },
+]
+provides-extras = ["gymnasium", "dev", "train"]
 
 [[package]]
 name = "pyparsing"

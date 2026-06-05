@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 
 # ── Metadata helpers (duplicated from benchmark_scaling to keep scripts self-contained) ──

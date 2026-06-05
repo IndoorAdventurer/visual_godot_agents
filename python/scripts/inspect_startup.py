@@ -20,7 +20,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 # How many frames to capture (frame 0 = returned by connect()).
 N_FRAMES = 15

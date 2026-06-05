@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from godot_vga.ipc_client import IPCClient
+from py_vga.ipc_client import IPCClient
 
 
 def _blank_frame(h: int, w: int, c: int) -> np.ndarray:

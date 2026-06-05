@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import gymnasium as gym
 import numpy as np
-from godot_vga.gymnasium_env import GodotVectorEnv
+from py_vga.gymnasium_env import GodotVectorEnv
 import torch
 import torch.nn as nn
 import torch.optim as optim
