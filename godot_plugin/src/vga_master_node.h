@@ -72,15 +72,11 @@ namespace godot {
 
             /**
              * Create the simulation environments. Gets called in _ready().
-             * Returns the created SubViewports in env order.
+             * Fills r_viewports and r_agents in env order; returns false if an
+             * environment scene contains no VGAAgentNode.
              */
-            std::vector<SubViewport *> _init_envs();
-
-            /**
-             * Walks subviewport children and returns the VGAAgentNode found in
-             * each environment scene. Called in _ready() after _init_envs().
-             */
-            std::vector<VGAAgentNode *> _collect_agents();
+            bool _init_envs(std::vector<SubViewport *> *r_viewports,
+                            std::vector<VGAAgentNode *> *r_agents);
     };
 
 } // namespace godot

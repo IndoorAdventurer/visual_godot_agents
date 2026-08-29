@@ -29,8 +29,13 @@ void VGAMasterNode::_ready() {
     _apply_cmdline_args();
     _configure_sim_loop();
 
-    std::vector<SubViewport *> subviewports = _init_envs();
-    std::vector<VGAAgentNode *> agents = _collect_agents();
+    std::vector<SubViewport *> subviewports;
+    std::vector<VGAAgentNode *> agents;
+    if (!_init_envs(&subviewports, &agents)) {
+        ERR_PRINT("VGAMasterNode: environment initialization failed. Quitting.");
+        get_tree()->quit();
+        return;
+    }
 
     if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
         ERR_PRINT("VGAMasterNode: IPCController initialization failed. Quitting.");
@@ -227,12 +232,13 @@ void VGAMasterNode::_configure_sim_loop() {
     RenderingServer::get_singleton()->set_render_loop_enabled(false);
 }
 
-std::vector<SubViewport *> VGAMasterNode::_init_envs() {
-    std::vector<SubViewport *> viewports;
+bool VGAMasterNode::_init_envs(std::vector<SubViewport *> *r_viewports,
+                               std::vector<VGAAgentNode *> *r_agents) {
     if (d_env_scene.is_null())
-        return viewports;
+        return false;
 
-    viewports.reserve(d_num_envs);
+    r_viewports->reserve(d_num_envs);
+    r_agents->reserve(d_num_envs);
     for (int idx = 0; idx != d_num_envs; ++idx) {
         // Create subviewport:
         SubViewport *subview = memnew(SubViewport);
@@ -242,31 +248,28 @@ std::vector<SubViewport *> VGAMasterNode::_init_envs() {
 
         // Instantiate simulation scene:
         Node *scene_inst = d_env_scene->instantiate();
+
+        TypedArray<Node> found = scene_inst->find_children("*", "VGAAgentNode", true, false);
+        VGAAgentNode *agent = found.is_empty()
+                                ? nullptr
+                                : Object::cast_to<VGAAgentNode>(found[0]);
+        if (!agent) {
+            ERR_PRINT("VGAMasterNode: no VGAAgentNode found in environment scene.");
+            memdelete(scene_inst);
+            memdelete(subview);
+            return false;
+        }
+        // Giving each agent its own index so it can be used, for example
+        // to give each environment a unique random seed later on. This must
+        // happen before the scene enters the tree, so get_env_index() is
+        // already valid inside the environment's own _ready().
+        agent->set_env_index(static_cast<int64_t>(idx));
+
         subview->add_child(scene_inst);
         add_child(subview);
 
-        viewports.push_back(subview);
+        r_viewports->push_back(subview);
+        r_agents->push_back(agent);
     }
-    return viewports;
-}
-
-std::vector<VGAAgentNode *> VGAMasterNode::_collect_agents() {
-    std::vector<VGAAgentNode *> agents;
-    int child_count = get_child_count();
-    for (int i = 0; i != child_count; ++i) {
-        SubViewport *sv = Object::cast_to<SubViewport>(get_child(i));
-        if (!sv)
-            continue;
-        TypedArray<Node> found = sv->find_children("*", "VGAAgentNode", true, false);
-        if (found.is_empty()) {
-            ERR_PRINT("VGAMasterNode: no VGAAgentNode found in environment scene.");
-            continue;
-        }
-        VGAAgentNode *agent = Object::cast_to<VGAAgentNode>(found[0]);
-        // Giving each agent its own index so it can be used, for example
-        // to give each environment a unique random seed later on:
-        agent->set_env_index(static_cast<int64_t>(agents.size()));
-        agents.push_back(agent);
-    }
-    return agents;
+    return true;
 }
