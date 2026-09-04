@@ -7,6 +7,7 @@ extends Node3D
 
 func _ready() -> void:
 	dirt_sys.robot = robot
+	dirt_sys.agent = agent
 	trail_sys.robot = robot
 	agent.dirt_sys = dirt_sys
 	agent.trail_sys = trail_sys

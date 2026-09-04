@@ -1,6 +1,6 @@
 #pragma once
 #include "ipc_posix.h"
-#include "ipc_visuals.h"
+#include "ipc_gpu.h"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -14,7 +14,7 @@ namespace godot {
       * synchronization involved. This includes:
       * - Semaphore synchronization with Python
       * - Interacting with VGAAgentNodes
-      * - Offloading visual input from the GPU
+      * - Offloading visual observations and user data from the GPU
       */
     class IPCController {
 
@@ -34,16 +34,16 @@ namespace godot {
 
         // Constituent helper objects:
         IPCPosix d_posix;       // Responsible for POSIX IPC
-        IPCVisuals d_vis;       // Responsible for visual readback from GPU
+        IPCGpu d_gpu;           // Responsible for all GPU readback
 
         // Layout, etc:
-        size_t d_num_envs         = 0;
-        size_t d_visual_obs_size  = 0;
-        size_t d_scalar_obs_size  = 0;
-        size_t d_action_size      = 0;
-        uint32_t d_visual_width   = 0;
-        uint32_t d_visual_height  = 0;
+        size_t d_num_envs          = 0;
+        uint32_t d_visual_width    = 0;
+        uint32_t d_visual_height   = 0;
         uint32_t d_visual_channels = 0;
+        size_t d_visual_obs_size   = 0;  // width * height * channels
+        size_t d_scalar_obs_size   = 0;
+        size_t d_action_size       = 0;
         std::vector<VGAAgentNode *> d_agents;
 
         // Byte offsets into shared memory, fixed after initialize():
@@ -53,6 +53,9 @@ namespace godot {
         size_t d_terminated_offset   = 0;
         size_t d_truncated_offset    = 0;
         size_t d_actions_offset      = 0;
+
+        // GPU-side only — never enters shared memory or the Header:
+        size_t d_gpu_data_size = 0;  // bytes per env; 0 disables the feature
 
         public:
             IPCController()  = default;
@@ -96,12 +99,6 @@ namespace godot {
              */
             bool exchange(double p_delta);
 
-            /**
-             * Replaces the stored agent pointers after an environment reset that
-             * recreates agent nodes. Sizes must be unchanged from initialize().
-             */
-            void set_agents(const std::vector<VGAAgentNode *> &agents);
-
         private:
             /**
              * Triggers a render and immediately reads the resulting frame from the
@@ -123,6 +120,11 @@ namespace godot {
              * apply_action() on the corresponding agent.
              */
             void _dispatch_actions() const;
+
+            /**
+             * Hands every agent its slice of the shared GPU data buffer.
+             */
+            void _bind_agent_gpu_data() const;
     };
 
 } // namespace godot

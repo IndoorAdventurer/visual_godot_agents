@@ -37,6 +37,9 @@ trap "echo 'Cleaning up Xvfb...'; kill $XVFB_PID 2>/dev/null || true" EXIT
 sleep 1
 
 # ── Training ──────────────────────────────────────────────────────────────────
+# TODO: broken since the repo restructure — roomba_demo/ has no pyproject.toml
+# any more, the only one is in python_package/. Fix the working directory (or
+# point uv at the project explicitly) before the next training run.
 cd "$SCRIPT_DIR/.."   # run from roomba_demo/ so uv picks up pyproject.toml
 
 EXTRA_ARGS=""

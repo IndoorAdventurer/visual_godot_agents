@@ -1,4 +1,4 @@
-#include "ipc_visuals.h"
+#include "ipc_gpu.h"
 #include "vga_profile.h"
 
 #include <godot_cpp/classes/rd_sampler_state.hpp>
@@ -31,30 +31,32 @@ static_assert(sizeof(PushConstants) == 16,
 
 } // anonymous namespace
 
-IPCVisuals::~IPCVisuals() {
+IPCGpu::~IPCGpu() {
     if (d_rd == nullptr) return;
 
     // Free in reverse order of dependency: uniform sets → pipeline → shader → sampler → buffer.
     for (RID &us : d_uniform_sets)
         if (us.is_valid()) d_rd->free_rid(us);
-    if (d_pipeline.is_valid())       d_rd->free_rid(d_pipeline);
-    if (d_shader.is_valid())         d_rd->free_rid(d_shader);
-    if (d_sampler.is_valid())        d_rd->free_rid(d_sampler);
-    if (d_staging_buffer.is_valid()) d_rd->free_rid(d_staging_buffer);
+    if (d_pipeline.is_valid())        d_rd->free_rid(d_pipeline);
+    if (d_shader.is_valid())          d_rd->free_rid(d_shader);
+    if (d_sampler.is_valid())         d_rd->free_rid(d_sampler);
+    if (d_staging_buffer.is_valid())  d_rd->free_rid(d_staging_buffer);
+    if (d_gpu_data_buffer.is_valid()) d_rd->free_rid(d_gpu_data_buffer);
 }
 
-bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
-                                Vector2i res, uint32_t channels) {
-    d_num_envs = static_cast<uint32_t>(viewports.size());
-    d_width    = static_cast<uint32_t>(res.x);
-    d_height   = static_cast<uint32_t>(res.y);
-    d_channels = channels;
+bool IPCGpu::initialize(const std::vector<SubViewport *> &viewports,
+                                Vector2i res, uint32_t channels,
+                                uint32_t gpu_data_size) {
+    d_num_envs      = static_cast<uint32_t>(viewports.size());
+    d_width         = static_cast<uint32_t>(res.x);
+    d_height        = static_cast<uint32_t>(res.y);
+    d_channels      = channels;
+    d_gpu_data_size = gpu_data_size;
 
     d_rd = RenderingServer::get_singleton()->get_rendering_device();
-    if (d_rd == nullptr) {
-        ERR_PRINT("IPCVisuals: no RenderingDevice — is a Vulkan/Metal/D3D12 renderer active?");
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(
+        d_rd == nullptr, false,
+        "IPCGpu: no RenderingDevice — is a Vulkan/Metal/D3D12 renderer active?");
 
     // Cache each SubViewport's own RID so _late_init() can call
     // viewport_get_texture() on it after force_draw() has run.
@@ -65,12 +67,20 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
     for (SubViewport *vp : viewports)
         d_rs_rids.push_back(vp->get_viewport_rid());
 
-    // One storage buffer large enough for all env pixels:
-    d_buf_size = d_num_envs * d_width * d_height * d_channels;
-    d_staging_buffer = d_rd->storage_buffer_create(d_buf_size);
-    if (!d_staging_buffer.is_valid()) {
-        ERR_PRINT("IPCVisuals: failed to create staging buffer.");
-        return false;
+    // One storage buffer large enough for all env pixels, plus the user GPU
+    // data block in the tail so both ride on a single buffer_get_data.
+    d_visual_bytes  = d_num_envs * d_width * d_height * d_channels;
+    d_staging_size  = d_visual_bytes + d_num_envs * d_gpu_data_size;
+    d_staging_buffer = d_rd->storage_buffer_create(d_staging_size);
+    ERR_FAIL_COND_V_MSG(
+        !d_staging_buffer.is_valid(), false,
+        "IPCGpu: failed to create staging buffer.");
+
+    if (d_gpu_data_size != 0) {
+        d_gpu_data_buffer = d_rd->storage_buffer_create(d_num_envs * d_gpu_data_size);
+        ERR_FAIL_COND_V_MSG(
+            !d_gpu_data_buffer.is_valid(), false,
+            "IPCGpu: failed to create GPU data buffer.");
     }
 
     // Compile the shader:
@@ -80,33 +90,25 @@ bool IPCVisuals::initialize(const std::vector<SubViewport *> &viewports,
                           String(k_copy_viewports_glsl));
 
     Ref<RDShaderSPIRV> spirv = d_rd->shader_compile_spirv_from_source(src);
-    if (spirv.is_null()) {
-        ERR_PRINT("IPCVisuals: shader SPIRV compilation failed.");
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(spirv.is_null(), false, "IPCGpu: shader SPIRV compilation failed.");
     String err = spirv->get_stage_compile_error(RenderingDevice::SHADER_STAGE_COMPUTE);
-    if (!err.is_empty()) {
-        ERR_PRINT("IPCVisuals: compute shader compile error: " + err);
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(!err.is_empty(), false, "IPCGpu: compute shader compile error: " + err);
 
     d_shader = d_rd->shader_create_from_spirv(spirv);
-    if (!d_shader.is_valid()) {
-        ERR_PRINT("IPCVisuals: shader_create_from_spirv failed.");
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(
+        !d_shader.is_valid(), false,
+        "IPCGpu: shader_create_from_spirv failed.");
 
     // Create pipeline:
     d_pipeline = d_rd->compute_pipeline_create(d_shader);
-    if (!d_pipeline.is_valid()) {
-        ERR_PRINT("IPCVisuals: compute_pipeline_create failed.");
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(
+        !d_pipeline.is_valid(), false,
+        "IPCGpu: compute_pipeline_create failed.");
 
     return true;
 }
 
-bool IPCVisuals::_late_init() {
+bool IPCGpu::_late_init() {
     // Resolves RS-level RIDs → RD-level RIDs. Must run after at least one
     // force_draw() so the SubViewport framebuffers exist on the render thread.
     // VGAMasterNode::_ready() calls force_draw(false) explicitly for this purpose;
@@ -116,15 +118,13 @@ bool IPCVisuals::_late_init() {
     d_source_rids.reserve(d_num_envs);
     for (const RID &viewport_rid : d_rs_rids) {
         RID tex_rid = rs->viewport_get_texture(viewport_rid);
-        if (!tex_rid.is_valid()) {
-            ERR_PRINT("IPCVisuals: viewport_get_texture returned invalid RID — is the SubViewport in the scene tree?");
-            return false;
-        }
+        ERR_FAIL_COND_V_MSG(
+            !tex_rid.is_valid(), false,
+            "IPCGpu: viewport_get_texture returned invalid RID — is the SubViewport in the scene tree?");
         RID rd_rid = rs->texture_get_rd_texture(tex_rid);
-        if (!rd_rid.is_valid()) {
-            ERR_PRINT("IPCVisuals: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
-            return false;
-        }
+        ERR_FAIL_COND_V_MSG(
+            !rd_rid.is_valid(), false,
+            "IPCGpu: SubViewport has no RD texture — was force_draw() called before fetch_frame()?");
         d_source_rids.push_back(rd_rid);
     }
 
@@ -134,10 +134,7 @@ bool IPCVisuals::_late_init() {
     // Default RDSamplerState is nearest/clamp, which is exactly what we need;
     // no fields need changing.
     d_sampler = d_rd->sampler_create(sampler_state);
-    if (!d_sampler.is_valid()) {
-        ERR_PRINT("IPCVisuals: sampler_create failed.");
-        return false;
-    }
+    ERR_FAIL_COND_V_MSG(!d_sampler.is_valid(), false, "IPCGpu: sampler_create failed.");
 
     // --- Per-env uniform sets ---
     // Each set binds one source texture (binding 0, sampler+texture) and the
@@ -164,21 +161,26 @@ bool IPCVisuals::_late_init() {
         uniforms.push_back(buf_uniform);
 
         RID us = d_rd->uniform_set_create(uniforms, d_shader, 0);
-        if (!us.is_valid()) {
-            ERR_PRINT("IPCVisuals: uniform_set_create failed for env " + itos(i));
-            return false;
-        }
+        ERR_FAIL_COND_V_MSG(
+            !us.is_valid(), false,
+            "IPCGpu: uniform_set_create failed for env " + itos(i));
         d_uniform_sets.push_back(us);
     }
 
     return true;
 }
 
-bool IPCVisuals::fetch_frame(uint8_t *dst) {
+bool IPCGpu::fetch_frame(uint8_t *dst) {
     if (d_source_rids.empty()) {
         if (!_late_init())
             return false;
     }
+
+    // Fold the user GPU data block into the staging tail. Godot 4.3+ tracks
+    // buffer dependencies and inserts the barriers, so no explicit sync needed.
+    if (d_gpu_data_size != 0)
+        d_rd->buffer_copy(d_gpu_data_buffer, d_staging_buffer, 0,
+                          d_visual_bytes, d_num_envs * d_gpu_data_size);
 
     VGA_PROFILE_PUSH("compute_dispatch");
     int64_t compute_list = d_rd->compute_list_begin();
@@ -215,16 +217,26 @@ bool IPCVisuals::fetch_frame(uint8_t *dst) {
     // Profiling at 32 envs × 128×128 (see tag profiling/gpu-readback-2026-05-20):
     // GPU render fence wait ~3.4 ms, compute ~140 µs, this DMA transfer ~500 µs.
     VGA_PROFILE_PUSH("buffer_get_data");
-    PackedByteArray data = d_rd->buffer_get_data(d_staging_buffer, 0, d_buf_size);
+    d_last_readback = d_rd->buffer_get_data(d_staging_buffer, 0, d_staging_size);
     VGA_PROFILE_POP();
-    if (static_cast<uint32_t>(data.size()) != d_buf_size) {
-        ERR_PRINT("IPCVisuals: buffer_get_data returned unexpected size — skipping memcpy.");
-        return false;
+    if (static_cast<uint32_t>(d_last_readback.size()) != d_staging_size) {
+        d_last_readback = PackedByteArray();
+        ERR_FAIL_V_MSG(
+            false,
+            "IPCGpu: buffer_get_data returned unexpected size — skipping memcpy.");
     }
 
+    // Only the visual bytes go to shm; the GPU data tail stays CPU-side for
+    // agents to read via gpu_data_ptr().
     VGA_PROFILE_PUSH("memcpy");
-    memcpy(dst, data.ptr(), d_buf_size);
+    memcpy(dst, d_last_readback.ptr(), d_visual_bytes);
     VGA_PROFILE_POP();
 
     return true;
+}
+
+const uint8_t *IPCGpu::gpu_data_ptr(uint32_t env) const {
+    if (d_gpu_data_size == 0 || d_last_readback.is_empty())
+        return nullptr;
+    return d_last_readback.ptr() + d_visual_bytes + env * d_gpu_data_size;
 }

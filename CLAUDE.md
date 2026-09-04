@@ -29,15 +29,19 @@ in default (idle) process mode will all expire immediately.
 **C++ (GDExtension)**
 - `VGAMasterNode` — root node; owns N SubViewports (one per simulated environment) and is
   responsible for the IPC exchanges with Python. IPC functionality is delegated to:
-  - `IPCController` — orchestrates all IPC: owns `IPCPosix` and `IPCVisuals`, drives the
+  - `IPCController` — orchestrates all IPC: owns `IPCPosix` and `IPCGpu`, drives the
     exchange loop, and manages shared memory layout
     - `IPCPosix` — low-level POSIX shared memory + semaphores
-    - `IPCVisuals` — GPU readback pipeline (compute shader → staging buffer → shared memory)
+    - `IPCGpu` — GPU readback pipeline (compute shader → staging buffer → shared memory)
 - `VGAAgentNode` — GDScript-overridable data gateway for an individual environment: collects observations,
   rewards and done flags; receives actions
 
 Visual observations are read back from each SubViewport's GPU texture and written directly
-into the shared memory visual block by `IPCVisuals::fetch_frame()`.
+into the shared memory visual block by `IPCGpu::fetch_frame()`.
+
+Values an environment computes on the GPU are returned the same way: one shared `N * size`
+buffer that `IPCGpu` folds into the staging buffer tail, so it rides along on that same
+readback. Opt in with `_get_gpu_data_size()`; see `doc_classes/VGAAgentNode.xml` for the API.
 
 Only classes exposed as Godot nodes need `GDREGISTER_CLASS` in `godot_plugin/src/register_types.cpp` and
 XML documentation in `godot_plugin/doc_classes/`. Internal C++ components need neither.

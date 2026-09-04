@@ -35,11 +35,9 @@ func _collect_scalar_obs() -> PackedByteArray:
 	return PackedByteArray([1])
 
 func _get_reward() -> float:
-	# NOTE: doing it in this very inefficient manner currently. Later on want to do it in a more
-	# efficient way that doesn't require N buffer_get_data calls.
 	if dirt_sys == null:
 		return 0.0
-	var collected_dirt_latest = dirt_sys.get_total_collected()
+	var collected_dirt_latest = get_gpu_data().decode_u32(0)
 	var dirt_reward = (collected_dirt_latest - collected_dirt) / float(dirt_sys.n_particles)
 	collected_dirt = collected_dirt_latest
 	
@@ -71,3 +69,7 @@ func _get_action_size() -> int:
 
 func _get_scalar_obs_size() -> int:
 	return 1
+
+func _get_gpu_data_size() -> int:
+	# One uint: dirt particles collected this episode.
+	return 4

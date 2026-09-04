@@ -62,6 +62,7 @@ def _run_single(
     obs_height: int | None,
     warmup_steps: int,
     measured_steps: int,
+    random_actions: bool,
 ) -> dict:
     """
     Launch Godot, run warmup + measurement, shut Godot down, return raw data.
@@ -80,15 +81,25 @@ def _run_single(
         state = client.connect()
 
         n = client.num_envs
-        actions = np.zeros((n, client.action_size), dtype=np.uint8)
+        # Zero actions leave the agent motionless, which keeps timings clean but
+        # exercises none of the environment's episode logic. Random actions are
+        # seeded, so runs stay comparable to each other.
+        rng = np.random.default_rng(0) if random_actions else None
+
+        def _actions() -> np.ndarray:
+            if rng is None:
+                return np.zeros((n, client.action_size), dtype=np.uint8)
+            floats = rng.uniform(-1.0, 1.0, size=(n, client.action_size // 4))
+            return floats.astype(np.float32).view(np.uint8)
 
         for _ in range(warmup_steps):
-            state = client.step(actions)
+            state = client.step(_actions())
 
         latencies: list[float] = []
         t_start = time.perf_counter()
 
         for i in range(measured_steps):
+            actions = _actions()
             t0 = time.perf_counter()
             state = client.step(actions)
             latencies.append(time.perf_counter() - t0)
@@ -138,6 +149,9 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Output file (appended to if it already exists)")
     p.add_argument("--name",    default="vga",
                    help="IPC name passed to Godot")
+    p.add_argument("--random-actions", action="store_true",
+                   help="Send seeded random actions instead of zeros, so episode "
+                        "logic (termination, reset) actually runs.")
     p.add_argument("--obs-width",  type=int, default=None)
     p.add_argument("--obs-height", type=int, default=None)
     return p
@@ -172,6 +186,7 @@ def main() -> None:
                     obs_height=args.obs_height,
                     warmup_steps=args.warmup,
                     measured_steps=args.steps,
+                    random_actions=args.random_actions,
                 )
 
                 record = {

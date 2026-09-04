@@ -3,6 +3,7 @@ extends Node3D
 
 # Set one level up
 var robot: Node3D
+var agent: VGAAgentNode
 
 # The number of dirt particles to clean up
 @export var n_particles : int = 700
@@ -15,7 +16,6 @@ var robot: Node3D
 
 var _rd: RenderingDevice
 var _buffer: RID
-var _counter_buffer: RID
 var _byte_count : int
 
 var _cp_shader : RID
@@ -31,9 +31,6 @@ func _ready() -> void:
 	# 4 floats per particle (x, y, z, alive), 4 bytes each
 	_byte_count = n_particles * 4 * 4
 	_buffer = _rd.storage_buffer_create(_byte_count)
-
-	# Separate single-uint counter buffer, reset to 0 on each step by the compute shader
-	_counter_buffer = _rd.storage_buffer_create(4)
 	
 	_multimesh_stuff()
 	_setup_compute()
@@ -42,15 +39,20 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if robot == null:
 		return
+	# VGAMasterNode creates the shared GPU data buffer after our _ready() has
+	# already run, so the uniform set can only be built once stepping starts.
+	if not _uniform_set.is_valid():
+		_create_uniform_set()
 	var robot_pos = robot.global_position
-	
+
 	#layout(push_constant, std430) uniform PushConstants {
 		#vec2 robot_pos;            8 bytes offset 0
 		#float suction_radius;      4 bytes offset 8
 		#float collection_radius;   4 bytes offset 12
 		#float delta;               4 bytes offset 16
 		#uint n_particles;          4 bytes offset 20
-	#} pc;							24 bytes total (have to round to 32 for some reason)
+		#uint env_index;            4 bytes offset 24
+	#} pc;							28 bytes total (have to round to 32 for some reason)
 	var push_consts = PackedByteArray()
 	push_consts.resize(32) # See above
 	push_consts.encode_float(0, robot_pos.x)
@@ -59,6 +61,7 @@ func _physics_process(delta: float) -> void:
 	push_consts.encode_float(12, collection_radius)
 	push_consts.encode_float(16, delta)
 	push_consts.encode_u32(20, n_particles)
+	push_consts.encode_u32(24, agent.get_env_index())
 	
 	var cl = _rd.compute_list_begin()
 	
@@ -102,15 +105,6 @@ func reset() -> void:
 
 	_rd.buffer_update(_buffer, 0, data.size(), data)
 
-	# Reset the collection counter to 0 for the new episode
-	var zero := PackedByteArray()
-	zero.resize(4)
-	zero.fill(0)
-	_rd.buffer_update(_counter_buffer, 0, 4, zero)
-
-func get_total_collected() -> int:
-	return _rd.buffer_get_data(_counter_buffer, 0, 4).decode_u32(0)
-
 func _multimesh_stuff() -> void:
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(0.08, 0.08)
@@ -132,25 +126,26 @@ func _setup_compute() -> void:
 	var spriv : RDShaderSPIRV = load("res://dirt_compute.glsl").get_spirv()
 	_cp_shader = _rd.shader_create_from_spirv(spriv)
 	_pipeline = _rd.compute_pipeline_create(_cp_shader)
-	
-	# Creating the uniform set:
+
+func _create_uniform_set() -> void:
 	var particles := RDUniform.new()
 	particles.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 	particles.binding = 0
 	particles.add_id(_buffer)
 	
-	var counter = RDUniform.new()
-	counter.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-	counter.binding = 1
-	counter.add_id(_counter_buffer)
-	
 	var multi_mesh_buf = RDUniform.new()
 	multi_mesh_buf.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
-	multi_mesh_buf.binding = 2
+	multi_mesh_buf.binding = 1
 	multi_mesh_buf.add_id(RenderingServer.multimesh_get_buffer_rd_rid(_mm.get_rid()))
 	
+	# All envs share this one buffer; pc.env_index picks our slice.
+	var vga_data = RDUniform.new()
+	vga_data.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+	vga_data.binding = 2
+	vga_data.add_id(agent.get_gpu_buffer_rid())
+	
 	_uniform_set = _rd.uniform_set_create(
-		[particles, counter, multi_mesh_buf],
+		[particles, multi_mesh_buf, vga_data],
 		_cp_shader,
 		0
 	)

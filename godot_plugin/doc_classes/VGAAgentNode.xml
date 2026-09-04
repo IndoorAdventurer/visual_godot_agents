@@ -7,8 +7,58 @@
 		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
 		Override [method _get_scalar_obs_size] and [method _get_action_size] to declare the size of your observation and action spaces in bytes. These are queried once at startup and must remain constant for the lifetime of the node.
 		Override the per-step callbacks to implement your environment's logic.
+		Optionally, values your compute shaders produce can be returned without a per-environment [method RenderingDevice.buffer_get_data], whose cost grows with environment count. Override [method _get_gpu_data_size] to opt in, write via [method get_gpu_buffer_rid] and read with [method get_gpu_data].
 	</description>
 	<methods>
+		<method name="get_gpu_buffer_rid">
+			<return type="RID" />
+			<description>
+				Returns the shared GPU data buffer to bind in your own uniform set, or an invalid [RID] if [method _get_gpu_data_size] returns 0.
+				All environments share this one buffer, so your compute shader must index it by [method get_env_index]. Pass that index in your own push constant — writing to the wrong slice silently corrupts another environment's data.
+				The [RID] only becomes valid after [VGAMasterNode] has finished starting up, which is later than your node's [method Node._ready]. Build the uniform set lazily on the first [method Node._physics_process] instead.
+				[codeblock]
+				var data := RDUniform.new()
+				data.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
+				data.binding = 2
+				data.add_id(agent.get_gpu_buffer_rid())
+				_uniform_set = rd.uniform_set_create([data], shader, 0)
+
+				# Then, per dispatch — the index must reach the shader somehow:
+				var push_constants := PackedByteArray()
+				push_constants.resize(16)
+				push_constants.encode_u32(0, agent.get_env_index())
+				[/codeblock]
+				And in the compute shader:
+				[codeblock]
+				layout(set = 0, binding = 2, std430) buffer VGAData {
+				    uint collected[];
+				};
+				layout(push_constant, std430) uniform PushConstants {
+				    uint env_index;
+				} pc;
+
+				void main() {
+				    // ...
+				    atomicAdd(collected[pc.env_index], 1u);
+				}
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_gpu_data">
+			<return type="PackedByteArray" />
+			<description>
+				Returns this environment's slice of the shared GPU buffer, [method _get_gpu_data_size] bytes long.
+				Only readable from [method _get_reward], [method _get_episode_state] and [method _collect_scalar_obs]. Calling it anywhere else pushes an error and returns an empty array, because the data is only fetched from the GPU during the exchange with Python.
+				The data is one step old: environments dispatch their compute work in their own [method Node._physics_process], which runs after [VGAMasterNode]'s.
+			</description>
+		</method>
+		<method name="clear_gpu_data">
+			<return type="void" />
+			<description>
+				Zeroes this environment's slice of the shared GPU buffer. Called automatically at the start of every reset, before [method _reset] runs, so data never carries over between episodes. Within an episode the slice is left alone, so accumulators persist across steps until you call this yourself.
+				Invalidates [method get_gpu_data] for this environment for the rest of the step, since the value already read back no longer describes the buffer.
+			</description>
+		</method>
 		<method name="get_env_index">
 			<return type="int" />
 			<description>
@@ -22,45 +72,52 @@
 		<method name="_get_scalar_obs_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node.
+				You must override this. Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node; startup fails if it returns 0.
 			</description>
 		</method>
 		<method name="_get_action_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				Return the size in bytes of the action vector passed to [method _apply_action]. Must be constant for the lifetime of the node.
+				You must override this. Return the size in bytes of the action vector passed to [method _apply_action]. Must be constant for the lifetime of the node; startup fails if it returns 0.
 			</description>
 		</method>
-		<method name="_collect_scalar_obs" qualifiers="virtual">
-			<return type="PackedByteArray" />
+		<method name="_get_gpu_data_size" qualifiers="virtual">
+			<return type="int" />
 			<description>
-				Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size].
+				Override this only if your compute shaders write data you want back on the CPU. Return the size in bytes of this environment's slice of the shared GPU data buffer; the default returns 0, which disables the feature. Must be constant for the lifetime of the node.
+				This must equal the std430 array stride of the layout your compute shader declares. VGA never sees your GLSL, so it cannot check this for you — it only rejects sizes that are not a multiple of 4, which no std430 layout can have. Watch for padding: [code]struct { uint a; vec4 b; }[/code] has a stride of 32, not 20, because [code]vec4[/code] aligns to 16.
 			</description>
 		</method>
 		<method name="_apply_action" qualifiers="virtual">
 			<return type="void" />
 			<param index="0" name="action" type="PackedByteArray" />
 			<description>
-				Decode [param action] and apply it to the environment. Called once per physics step after Python responds with actions.
+				You must override this. Decode [param action] and apply it to the environment. Called once per physics step after Python responds with actions.
+			</description>
+		</method>
+		<method name="_collect_scalar_obs" qualifiers="virtual">
+			<return type="PackedByteArray" />
+			<description>
+				You must override this. Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size].
 			</description>
 		</method>
 		<method name="_get_reward" qualifiers="virtual">
 			<return type="float" />
 			<description>
-				Return the reward earned during this step.
+				You must override this. Return the reward earned during this step. The default returns 0.0.
 			</description>
 		</method>
 		<method name="_get_episode_state" qualifiers="virtual">
 			<return type="int" enum="VGAAgentNode.EpisodeState" />
 			<description>
-				Return the current episode state. Return [constant TERMINATED] when the episode ends naturally (goal reached, failure, etc.) or [constant TRUNCATED] when it ends artificially (time limit, out-of-bounds guard, etc.). Return [constant RUNNING] otherwise.
+				You must override this. Return the current episode state: [constant TERMINATED] when the episode ends naturally (goal reached, failure, etc.), [constant TRUNCATED] when it ends artificially (time limit, out-of-bounds guard, etc.), or [constant RUNNING] otherwise. The default returns [constant RUNNING], so episodes never end.
 				[VGAMasterNode] reads this each step and automatically resets the environment before collecting the next observation when the state is not [constant RUNNING], so [method _reset] will always be called before the next [method _collect_scalar_obs].
 			</description>
 		</method>
 		<method name="_reset" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				Reset the environment to its initial state for a new episode. Called automatically by [VGAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
+				You must override this. Reset the environment to its initial state for a new episode. Called automatically by [VGAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
 			</description>
 		</method>
 	</methods>

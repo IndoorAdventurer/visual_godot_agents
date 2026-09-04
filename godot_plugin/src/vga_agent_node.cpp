@@ -3,8 +3,10 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <cstring>
 
 using namespace godot;
 
@@ -20,6 +22,12 @@ size_t VGAAgentNode::get_scalar_obs_size() {
 size_t VGAAgentNode::get_action_size() {
     int64_t ret = 0;
     GDVIRTUAL_CALL(_get_action_size, ret);
+    return static_cast<size_t>(ret);
+}
+
+size_t VGAAgentNode::get_gpu_data_size() {
+    int64_t ret = 0;
+    GDVIRTUAL_CALL(_get_gpu_data_size, ret);
     return static_cast<size_t>(ret);
 }
 
@@ -46,6 +54,11 @@ VGAAgentNode::EpisodeState VGAAgentNode::get_episode_state() {
 }
 
 void VGAAgentNode::reset() {
+    // Episodes never carry GPU data over. Cleared before _reset() so an override
+    // is free to seed the slice with starting values.
+    if (d_gpu_buffer.is_valid())
+        clear_gpu_data();
+
     GDVIRTUAL_CALL(_reset);
 
     // Force the physics server to flush deferred transform updates for every
@@ -65,10 +78,47 @@ void VGAAgentNode::reset() {
     }
 }
 
+int64_t VGAAgentNode::get_env_index() const {
+    return d_env_index;
+}
+
+RID VGAAgentNode::get_gpu_buffer_rid() const {
+    return d_gpu_buffer;
+}
+
+PackedByteArray VGAAgentNode::get_gpu_data() const {
+    ERR_FAIL_COND_V_MSG(
+        !d_gpu_valid, PackedByteArray(),
+        "VGAAgentNode: GPU data is only readable during an exchange (from "
+        "_get_reward, _get_episode_state or _collect_scalar_obs), and not after "
+        "clear_gpu_data().");
+
+    PackedByteArray out;
+    out.resize(static_cast<int>(d_gpu_size));
+    std::memcpy(out.ptrw(), d_gpu_view, d_gpu_size);
+    return out;
+}
+
+void VGAAgentNode::clear_gpu_data() {
+    ERR_FAIL_COND_MSG(!d_gpu_buffer.is_valid(),
+                      "VGAAgentNode: no GPU data buffer — is _get_gpu_data_size() 0?");
+
+    RenderingDevice *rd = RenderingServer::get_singleton()->get_rendering_device();
+    rd->buffer_clear(d_gpu_buffer, static_cast<uint32_t>(d_gpu_offset),
+                     static_cast<uint32_t>(d_gpu_size));
+
+    // The readback predates this clear, so it no longer describes the buffer.
+    invalidate_gpu_data();
+}
+
 void VGAAgentNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_env_index"), &VGAAgentNode::get_env_index);
+    ClassDB::bind_method(D_METHOD("get_gpu_buffer_rid"), &VGAAgentNode::get_gpu_buffer_rid);
+    ClassDB::bind_method(D_METHOD("get_gpu_data"), &VGAAgentNode::get_gpu_data);
+    ClassDB::bind_method(D_METHOD("clear_gpu_data"), &VGAAgentNode::clear_gpu_data);
     GDVIRTUAL_BIND(_get_scalar_obs_size);
     GDVIRTUAL_BIND(_get_action_size);
+    GDVIRTUAL_BIND(_get_gpu_data_size);
     GDVIRTUAL_BIND(_apply_action, "p_action");
     GDVIRTUAL_BIND(_collect_scalar_obs);
     GDVIRTUAL_BIND(_get_reward);

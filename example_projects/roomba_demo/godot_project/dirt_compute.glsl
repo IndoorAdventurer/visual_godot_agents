@@ -6,11 +6,12 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0, std430) buffer ParticleBuffer {
     vec4 particles[];
 };
-layout(set = 0, binding = 1, std430) buffer CounterBuffer {
-    uint counter;
-};
-layout(set = 0, binding = 2, std430) buffer MultiMeshBuffer {
+layout(set = 0, binding = 1, std430) buffer MultiMeshBuffer {
     float transforms[];
+};
+// VGA's shared GPU data buffer: one uint per env, indexed by pc.env_index.
+layout(set = 0, binding = 2, std430) buffer VGAData {
+    uint vga_collected[];
 };
 
 layout(push_constant, std430) uniform PushConstants {
@@ -19,6 +20,7 @@ layout(push_constant, std430) uniform PushConstants {
     float collection_radius;
     float delta;
     uint n_particles;
+    uint env_index;
 } pc;
 
 void write_transform(uint i, vec4 p) {
@@ -46,7 +48,7 @@ void main() {
     // Kill particles that are close to the vacuum
     if (to_robot < pc.collection_radius) {
         p.w = 0.0;
-        atomicAdd(counter, 1u);
+        atomicAdd(vga_collected[pc.env_index], 1u);
     }
     else if (to_robot < pc.suction_radius) {
         float dist2 = to_robot * to_robot;
