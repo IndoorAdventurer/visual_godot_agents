@@ -29,19 +29,25 @@ void VGAMasterNode::_ready() {
     _apply_cmdline_args();
     _configure_sim_loop();
 
+    // Envs stay out of the tree until IPC init has bound the GPU data buffer,
+    // so get_gpu_buffer_rid() is valid inside their _ready().
     std::vector<SubViewport *> subviewports;
     std::vector<VGAAgentNode *> agents;
-    if (!_init_envs(&subviewports, &agents)) {
+    if (!_build_envs(&subviewports, &agents)) {
         ERR_PRINT("VGAMasterNode: environment initialization failed. Quitting.");
+        _discard_envs(subviewports);
         get_tree()->quit();
         return;
     }
 
     if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
         ERR_PRINT("VGAMasterNode: IPCController initialization failed. Quitting.");
+        _discard_envs(subviewports);
         get_tree()->quit();
         return;
     }
+
+    _attach_envs(subviewports);
 
     // Flush the render thread so SubViewport framebuffers exist on the GPU
     // before the first fetch_frame call. This force_draw is load-bearing:
@@ -232,8 +238,8 @@ void VGAMasterNode::_configure_sim_loop() {
     RenderingServer::get_singleton()->set_render_loop_enabled(false);
 }
 
-bool VGAMasterNode::_init_envs(std::vector<SubViewport *> *r_viewports,
-                               std::vector<VGAAgentNode *> *r_agents) {
+bool VGAMasterNode::_build_envs(std::vector<SubViewport *> *r_viewports,
+                                std::vector<VGAAgentNode *> *r_agents) {
     if (d_env_scene.is_null())
         return false;
 
@@ -266,10 +272,19 @@ bool VGAMasterNode::_init_envs(std::vector<SubViewport *> *r_viewports,
         agent->set_env_index(static_cast<int64_t>(idx));
 
         subview->add_child(scene_inst);
-        add_child(subview);
 
         r_viewports->push_back(subview);
         r_agents->push_back(agent);
     }
     return true;
+}
+
+void VGAMasterNode::_attach_envs(const std::vector<SubViewport *> &viewports) {
+    for (SubViewport *subview : viewports)
+        add_child(subview);
+}
+
+void VGAMasterNode::_discard_envs(const std::vector<SubViewport *> &viewports) {
+    for (SubViewport *subview : viewports)
+        memdelete(subview);
 }

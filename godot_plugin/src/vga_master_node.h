@@ -71,12 +71,26 @@ namespace godot {
             void _configure_sim_loop();
 
             /**
-             * Create the simulation environments. Gets called in _ready().
-             * Fills r_viewports and r_agents in env order; returns false if an
-             * environment scene contains no VGAAgentNode.
+             * Instantiate the simulation environments without adding them to the
+             * tree, so their _ready() has not run yet. Fills r_viewports and
+             * r_agents in env order; returns false if an environment scene
+             * contains no VGAAgentNode.
              */
-            bool _init_envs(std::vector<SubViewport *> *r_viewports,
-                            std::vector<VGAAgentNode *> *r_agents);
+            bool _build_envs(std::vector<SubViewport *> *r_viewports,
+                             std::vector<VGAAgentNode *> *r_agents);
+
+            /**
+             * Add the built SubViewports to the tree, running every env's _ready().
+             * Must be called after IPCController::initialize() so the GPU data
+             * buffer already exists by then.
+             */
+            void _attach_envs(const std::vector<SubViewport *> &viewports);
+
+            /**
+             * Free SubViewports that never made it into the tree. Only for the
+             * _ready() failure paths — once attached, the tree owns them.
+             */
+            void _discard_envs(const std::vector<SubViewport *> &viewports);
     };
 
 } // namespace godot

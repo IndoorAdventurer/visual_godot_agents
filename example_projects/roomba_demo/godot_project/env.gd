@@ -11,3 +11,4 @@ func _ready() -> void:
 	trail_sys.robot = robot
 	agent.dirt_sys = dirt_sys
 	agent.trail_sys = trail_sys
+	dirt_sys.create_uniform_set()

@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
-		Override [method _get_action_size] to declare the size of your action space in bytes, and [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones. These are queried once at startup and must remain constant for the lifetime of the node.
+		Override [method _get_action_size] to declare the size of your action space in bytes, and [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones. Together with [method _get_gpu_data_size], these are queried once before your environment enters the tree, so they must return hardcoded constants and cannot depend on anything [method Node._ready] sets up.
 		Override the per-step callbacks to implement your environment's logic.
 		Optionally, values your compute shaders produce can be returned without a per-environment [method RenderingDevice.buffer_get_data], whose cost grows with environment count. Override [method _get_gpu_data_size] to opt in, write via [method get_gpu_buffer_rid] and read with [method get_gpu_data].
 	</description>
@@ -15,7 +15,6 @@
 			<description>
 				Returns the shared GPU data buffer to bind in your own uniform set, or an invalid [RID] if [method _get_gpu_data_size] returns 0.
 				All environments share this one buffer, so your compute shader must index it by [method get_env_index]. Pass that index in your own push constant — writing to the wrong slice silently corrupts another environment's data.
-				The [RID] only becomes valid after [VGAMasterNode] has finished starting up, which is later than your node's [method Node._ready]. Build the uniform set lazily on the first [method Node._physics_process] instead.
 				[codeblock]
 				var data := RDUniform.new()
 				data.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
@@ -72,19 +71,19 @@
 		<method name="_get_scalar_obs_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node. The default returns 0, which disables scalar observations entirely — [method _collect_scalar_obs] is then never called, and Python receives an empty scalar block. Override it only if your environment needs observations beyond the visual ones.
+				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must return a hardcoded constant. The default returns 0, which disables scalar observations entirely — [method _collect_scalar_obs] is then never called, and Python receives an empty scalar block. Override it only if your environment needs observations beyond the visual ones.
 			</description>
 		</method>
 		<method name="_get_action_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				You must override this. Return the size in bytes of the action vector passed to [method _apply_action]. Must be constant for the lifetime of the node; startup fails if it returns 0.
+				You must override this. Return the size in bytes of the action vector passed to [method _apply_action]. Must return a hardcoded constant; startup fails if it returns 0.
 			</description>
 		</method>
 		<method name="_get_gpu_data_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				Override this only if your compute shaders write data you want back on the CPU. Return the size in bytes of this environment's slice of the shared GPU data buffer; the default returns 0, which disables the feature. Must be constant for the lifetime of the node.
+				Override this only if your compute shaders write data you want back on the CPU. Return the size in bytes of this environment's slice of the shared GPU data buffer; the default returns 0, which disables the feature. Must return a hardcoded constant.
 				This must equal the std430 array stride of the layout your compute shader declares. VGA never sees your GLSL, so it cannot check this for you — it only rejects sizes that are not a multiple of 4, which no std430 layout can have. Watch for padding: [code]struct { uint a; vec4 b; }[/code] has a stride of 32, not 20, because [code]vec4[/code] aligns to 16.
 			</description>
 		</method>

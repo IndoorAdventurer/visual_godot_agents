@@ -39,10 +39,6 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if robot == null:
 		return
-	# VGAMasterNode creates the shared GPU data buffer after our _ready() has
-	# already run, so the uniform set can only be built once stepping starts.
-	if not _uniform_set.is_valid():
-		_create_uniform_set()
 	var robot_pos = robot.global_position
 
 	#layout(push_constant, std430) uniform PushConstants {
@@ -127,7 +123,9 @@ func _setup_compute() -> void:
 	_cp_shader = _rd.shader_create_from_spirv(spriv)
 	_pipeline = _rd.compute_pipeline_create(_cp_shader)
 
-func _create_uniform_set() -> void:
+# Called by env.gd once `agent` has been injected — our own _ready() runs before
+# that, so we cannot do this ourselves.
+func create_uniform_set() -> void:
 	var particles := RDUniform.new()
 	particles.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 	particles.binding = 0
