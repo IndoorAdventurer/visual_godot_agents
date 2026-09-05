@@ -31,10 +31,10 @@ bool IPCController::initialize(
         "IPCController: _get_gpu_data_size() must be a multiple of 4 "
         "(std430 array stride), got " + itos(gpu_data_size) + ".");
 
-    // TODO: I feel like scalar_obs_size should allow for 0, as some
-    // environments will only depend on visual observations.
-    ERR_FAIL_COND_V_MSG(scalar_obs_size == 0 || action_size == 0, false,
-                        "IPCController: agent reports zero-size scalar obs or action.");
+    // scalar_obs_size may be 0 — environments driven purely by visual obs skip
+    // the scalar block entirely.
+    ERR_FAIL_COND_V_MSG(action_size == 0, false,
+                        "IPCController: agent reports zero-size action.");
 
     d_num_envs        = num_envs;
     d_visual_width    = visual_res.x;
@@ -142,9 +142,11 @@ void IPCController::_write_env_state() const {
     for (size_t i = 0; i != d_num_envs; ++i) {
         VGAAgentNode *agent = d_agents[i];
 
-        PackedByteArray obs = agent->collect_scalar_obs();
-        std::memcpy(scalar_obs_base + i * d_scalar_obs_size,
-                    obs.ptr(), d_scalar_obs_size);
+        if (d_scalar_obs_size != 0) {
+            PackedByteArray obs = agent->collect_scalar_obs();
+            std::memcpy(scalar_obs_base + i * d_scalar_obs_size,
+                        obs.ptr(), d_scalar_obs_size);
+        }
 
         float reward = agent->get_reward();
         std::memcpy(rewards_base + i * sizeof(float), &reward, sizeof(float));

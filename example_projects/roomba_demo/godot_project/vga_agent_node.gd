@@ -31,9 +31,6 @@ func _apply_action(p_action: PackedByteArray) -> void:
 	strafe = clampf(p_action.decode_float(4), -1.0, 1.0)
 	turn = clampf(p_action.decode_float(8), -1.0, 1.0)
 
-func _collect_scalar_obs() -> PackedByteArray:
-	return PackedByteArray([1])
-
 func _get_reward() -> float:
 	if dirt_sys == null:
 		return 0.0
@@ -66,9 +63,6 @@ func _get_episode_state() -> int:
 func _get_action_size() -> int:
 	# 3 floats: forward, strafe and turn (4 bytes per float)
 	return 3 * 4
-
-func _get_scalar_obs_size() -> int:
-	return 1
 
 func _get_gpu_data_size() -> int:
 	# One uint: dirt particles collected this episode.

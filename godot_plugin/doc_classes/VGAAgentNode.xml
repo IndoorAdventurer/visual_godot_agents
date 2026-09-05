@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
-		Override [method _get_scalar_obs_size] and [method _get_action_size] to declare the size of your observation and action spaces in bytes. These are queried once at startup and must remain constant for the lifetime of the node.
+		Override [method _get_action_size] to declare the size of your action space in bytes, and [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones. These are queried once at startup and must remain constant for the lifetime of the node.
 		Override the per-step callbacks to implement your environment's logic.
 		Optionally, values your compute shaders produce can be returned without a per-environment [method RenderingDevice.buffer_get_data], whose cost grows with environment count. Override [method _get_gpu_data_size] to opt in, write via [method get_gpu_buffer_rid] and read with [method get_gpu_data].
 	</description>
@@ -72,7 +72,7 @@
 		<method name="_get_scalar_obs_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
-				You must override this. Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node; startup fails if it returns 0.
+				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must be constant for the lifetime of the node. The default returns 0, which disables scalar observations entirely — [method _collect_scalar_obs] is then never called, and Python receives an empty scalar block. Override it only if your environment needs observations beyond the visual ones.
 			</description>
 		</method>
 		<method name="_get_action_size" qualifiers="virtual">
@@ -98,7 +98,7 @@
 		<method name="_collect_scalar_obs" qualifiers="virtual">
 			<return type="PackedByteArray" />
 			<description>
-				You must override this. Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size].
+				Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size]. Only called when that returns non-zero.
 			</description>
 		</method>
 		<method name="_get_reward" qualifiers="virtual">
