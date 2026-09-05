@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── Configuration ─────────────────────────────────────────────────────────────
 GODOT_BINARY="${GODOT_BINARY:-$(command -v godot)}"
 PROJECT_PATH="$SCRIPT_DIR/../godot_project"
+PYTHON_PROJECT="$SCRIPT_DIR/../../../python_package"
 NUM_ENVS=32
 NUM_INSTANCES=4
 OBS_WIDTH=64
@@ -37,17 +38,17 @@ trap "echo 'Cleaning up Xvfb...'; kill $XVFB_PID 2>/dev/null || true" EXIT
 sleep 1
 
 # ── Training ──────────────────────────────────────────────────────────────────
-# TODO: broken since the repo restructure — roomba_demo/ has no pyproject.toml
-# any more, the only one is in python_package/. Fix the working directory (or
-# point uv at the project explicitly) before the next training run.
-cd "$SCRIPT_DIR/.."   # run from roomba_demo/ so uv picks up pyproject.toml
+# Run from roomba_demo/ so runs/ lands with the demo; the uv project lives
+# elsewhere (python_package/), hence --project.
+cd "$SCRIPT_DIR/.."
 
 EXTRA_ARGS=""
 if [[ -n "$RESUME_FROM" ]]; then
     EXTRA_ARGS="--resume-from $RESUME_FROM"
 fi
 
-uv run python scripts/clean_rl_ppo_test.py \
+uv run --project "$PYTHON_PROJECT" --extra train \
+    python scripts/clean_rl_ppo_test.py \
     --godot-binary "$GODOT_BINARY" \
     --project-path "$PROJECT_PATH" \
     --num-envs "$NUM_ENVS" \
