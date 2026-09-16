@@ -210,7 +210,9 @@ if __name__ == "__main__":
     actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
     logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    # Marks observations that BEGIN an episode, not ones that end it: Godot reports done
+    # with the terminal observation, so the new episode starts on the following one.
+    episode_starts = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
 
     # TRY NOT TO MODIFY: start the game
@@ -221,7 +223,8 @@ if __name__ == "__main__":
     # from_numpy keeps the observation uint8; torch.Tensor is an alias for FloatTensor and
     # would widen it to float32 before the transfer, quadrupling every upload.
     next_obs = torch.from_numpy(next_obs).to(device)
-    next_done = torch.zeros(args.num_envs).to(device)
+    next_start = torch.ones(args.num_envs).to(device)  # the reset observation begins an episode
+    pending_done = torch.zeros(args.num_envs).to(device)  # done delivered with next_obs
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -233,7 +236,7 @@ if __name__ == "__main__":
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs.cpu()
-            dones[step] = next_done
+            episode_starts[step] = next_start
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
@@ -244,13 +247,16 @@ if __name__ == "__main__":
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
-            next_done = np.logical_or(terminations, truncations)
+            done_np = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs = torch.from_numpy(next_obs).to(device)
-            next_done = torch.Tensor(next_done).to(device)
+            # The observation just received is terminal when its done is set, so the new
+            # episode begins on the one after it: carry the previous flag forward.
+            next_start = pending_done
+            pending_done = torch.Tensor(done_np).to(device)
 
             episode_returns += reward
-            for i, done in enumerate(next_done.cpu().numpy().astype(bool)):
+            for i, done in enumerate(done_np):
                 if done:
                     print(f"global_step={global_step}, episodic_return={episode_returns[i]:.2f}")
                     writer.add_scalar("charts/episodic_return", episode_returns[i], global_step)
@@ -263,10 +269,10 @@ if __name__ == "__main__":
             lastgaelam = 0
             for t in reversed(range(args.num_steps)):
                 if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
+                    nextnonterminal = 1.0 - next_start
                     nextvalues = next_value
                 else:
-                    nextnonterminal = 1.0 - dones[t + 1]
+                    nextnonterminal = 1.0 - episode_starts[t + 1]
                     nextvalues = values[t + 1]
                 delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
                 advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
