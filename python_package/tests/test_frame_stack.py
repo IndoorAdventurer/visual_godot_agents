@@ -12,7 +12,8 @@ import numpy as np
 import torch
 from gymnasium.vector.utils import batch_space
 
-from py_vga.frame_stack import IndexedFrameStack
+from py_vga.indexed_frame_stack import IndexedFrameStack
+from py_vga.naive_frame_stack import NaiveFrameStack
 
 N = 2  # envs
 _pass = 0
@@ -275,6 +276,91 @@ if torch.cuda.is_available():
     check("cpu store is pinned", w._stores[None].is_pinned(), True)
 else:
     print("\ncuda unavailable — device checks skipped")
+
+print("\nNaiveFrameStack: real observations through the standard VectorEnv API")
+
+
+def run_naive(wrapper, env, steps, dones=None):
+    """As run(), but the wrapper yields observations rather than handles."""
+    dones = dones or {}
+    env.next_obs = image_obs(0)
+    out = [wrapper.reset()[0]]
+    for t in range(1, steps):
+        env.next_done = np.array(dones.get(t, [False] * N))
+        env.next_obs = image_obs(t)
+        out.append(wrapper.step(np.zeros(N))[0])
+    return out
+
+
+def nvals(stacked, stack):
+    return stacked.reshape(N, stack).astype(int).tolist()
+
+
+env = FakeVectorEnv(N, IMAGE)
+w = NaiveFrameStack(env, stack=3)
+check("single obs space gains a stack axis", w.single_observation_space.shape, (3, 1, 1, 1))
+check("batched obs space", w.observation_space.shape, (N, 3, 1, 1, 1))
+outs = run_naive(w, env, 6)
+check("returns numpy, not tensors", isinstance(outs[-1], np.ndarray), True)
+check("dtype preserved", outs[-1].dtype, np.dtype(np.uint8))
+check("observation shape", list(outs[-1].shape), [N, 3, 1, 1, 1])
+check("reset repeats its own frame", nvals(outs[0], 3), [[10, 10, 10], [20, 20, 20]])
+check("stack at t=5", nvals(outs[5], 3), [[13, 14, 15], [23, 24, 25]])
+
+env = FakeVectorEnv(N, IMAGE)
+w = NaiveFrameStack(env, stack=3)
+outs = run_naive(w, env, 6, dones={2: [True, False]})
+check("repeat padding at boundary", nvals(outs[3], 3), [[13, 13, 13], [21, 22, 23]])
+check("one step later", nvals(outs[4], 3), [[13, 13, 14], [22, 23, 24]])
+
+env = FakeVectorEnv(N, IMAGE)
+w = NaiveFrameStack(env, stack=3, padding="zero")
+outs = run_naive(w, env, 6, dones={2: [True, False]})
+check("zero padding at boundary", nvals(outs[3], 3), [[0, 0, 13], [21, 22, 23]])
+
+env = FakeVectorEnv(N, IMAGE)
+outs = run_naive(NaiveFrameStack(env, stack=3, stride=2), env, 8)
+check("stride", nvals(outs[7], 3), [[13, 15, 17], [23, 25, 27]])
+
+env = FakeVectorEnv(N, IMAGE)
+outs = run_naive(NaiveFrameStack(env, stack=1), env, 3)
+check("stack=1", nvals(outs[2], 1), [[12], [22]])
+
+env = FakeVectorEnv(N, dict_space)
+w = NaiveFrameStack(env, stack=2)
+env.next_obs = {"visual": image_obs(0), "scalar": np.array([[0.0, 0.5], [1.0, 1.5]], np.float32)}
+w.reset()
+env.next_obs = {"visual": image_obs(1), "scalar": np.array([[2.0, 2.5], [3.0, 3.5]], np.float32)}
+o1 = w.step(np.zeros(N))[0]
+check("dict keys", sorted(o1.keys()), ["scalar", "visual"])
+check("dict visual shape", list(o1["visual"].shape), [N, 2, 1, 1, 1])
+check("dict scalar shape", list(o1["scalar"].shape), [N, 2, 2])
+check(
+    "dict scalar values",
+    o1["scalar"].tolist(),
+    [[[0.0, 0.5], [2.0, 2.5]], [[1.0, 1.5], [3.0, 3.5]]],
+)
+
+env_a, env_b = FakeVectorEnv(N, IMAGE), FakeVectorEnv(N, IMAGE)
+wa, wb = NaiveFrameStack(env_a, stack=3), IndexedFrameStack(env_b, 20, stack=3)
+outs_a = run_naive(wa, env_a, 6, dones={2: [True, False]})
+handles_b = run(wb, env_b, 6, dones={2: [True, False]})
+check(
+    "both wrappers agree frame for frame",
+    [nvals(o, 3) for o in outs_a],
+    [vals(wb.get_obs(hb), 3) for hb in handles_b],
+)
+
+for label, kw in [
+    ("stack < 1", dict(stack=0)),
+    ("stride < 1", dict(stride=0)),
+    ("bad padding", dict(padding="bogus")),
+]:
+    expect_raises(
+        f"NaiveFrameStack {label}",
+        ValueError,
+        lambda kw=kw: NaiveFrameStack(FakeVectorEnv(N, IMAGE), **kw),
+    )
 
 print("\n" + "=" * 46)
 total = _pass + _fail

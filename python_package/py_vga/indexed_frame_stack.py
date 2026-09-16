@@ -2,11 +2,14 @@
 Frame stacking for vector environments, via observation handles.
 
 step() and reset() return an integer handle per environment instead of an
-observation; get_obs(handles) returns the stacked observation for any handles still
-in storage. Frames are stored once, so memory does not grow with stack depth.
+observation; get_obs(handles) resolves handles into stacked observations, whether
+those are the handles just returned while acting or a shuffled minibatch of them
+while training. Frames are stored once, so memory does not grow with stack depth.
 
-observation_space describes a handle, not an observation, so this wrapper does not
-compose with tooling that expects step() to return real observations.
+observation_space describes a handle, not an observation, so this does not compose
+with tooling that expects step() to return real observations — use it when you
+control the training loop. py_vga.naive_frame_stack.NaiveFrameStack is the portable
+alternative, returning real observations at a rollout buffer `stack` times larger.
 
 A handle encodes (timestep, env) and is never reused, including across clear().
 Frames are retained for `capacity` timesteps; a handle whose stack has been evicted
@@ -19,13 +22,11 @@ Observations are returned in their native dtype — scale them in the policy.
 
 torch and gymnasium are optional dependencies of py_vga, so import directly:
 
-    from py_vga.frame_stack import IndexedFrameStack
+    from py_vga.indexed_frame_stack import IndexedFrameStack
 """
 
 # TODO: SAC support — a next_obs lookup (handle + 1, stopping at episode boundaries)
 #       and a ring sized for replay rather than a single rollout.
-# TODO: a portable stacking wrapper returning real observations, for use with
-#       tooling that cannot accept handles.
 # TODO: helper to derive `capacity` from num_steps, stack and stride.
 
 import gymnasium
@@ -34,8 +35,7 @@ import torch
 from gymnasium.vector import VectorWrapper
 from gymnasium.vector.utils import batch_space
 
-_PADDING_MODES = ("repeat", "zero")
-_SINGLE = None  # store key used when the wrapped space is a plain Box
+from .frame_stack_common import SINGLE_KEY, leaf_spaces, validate_stacking
 
 
 class IndexedFrameStack(VectorWrapper):
@@ -69,13 +69,7 @@ class IndexedFrameStack(VectorWrapper):
         compute_device: torch.device | str | None = None,
     ):
         super().__init__(env)
-
-        if stack < 1:
-            raise ValueError(f"stack must be >= 1, got {stack}")
-        if stride < 1:
-            raise ValueError(f"stride must be >= 1, got {stride}")
-        if padding not in _PADDING_MODES:
-            raise ValueError(f"padding must be one of {_PADDING_MODES}, got {padding!r}")
+        validate_stacking(stack, stride, padding)
 
         self.stack = stack
         self.stride = stride
@@ -94,7 +88,7 @@ class IndexedFrameStack(VectorWrapper):
         )
 
         self.frame_observation_space = env.single_observation_space
-        leaves = _leaf_spaces(self.frame_observation_space)
+        leaves = leaf_spaces(self.frame_observation_space)
 
         n = self.num_envs
         # Pinned host memory lets the gather's copy to an accelerator overlap compute.
@@ -200,7 +194,7 @@ class IndexedFrameStack(VectorWrapper):
             if leaf.ndim == 5:  # (batch, stack, H, W, C) -> (batch, stack * C, H, W)
                 leaf = leaf.permute(0, 1, 4, 2, 3)
             out[key] = leaf.flatten(1, 2)
-        return out[_SINGLE] if _SINGLE in out else out
+        return out[SINGLE_KEY] if SINGLE_KEY in out else out
 
     def clear(self) -> None:
         """
@@ -235,25 +229,13 @@ class IndexedFrameStack(VectorWrapper):
         self._ep_start[slot] = self._cur_ep_start
 
         for key, store in self._stores.items():
-            leaf = obs if key is _SINGLE else obs[key]
+            leaf = obs if key is SINGLE_KEY else obs[key]
             if isinstance(leaf, np.ndarray):
                 leaf = torch.from_numpy(leaf)
             store[slot] = leaf.to(self.device, non_blocking=True)
 
         self._newest_t = t
         return t * self.num_envs + np.arange(self.num_envs, dtype=np.int64)
-
-
-def _leaf_spaces(space) -> dict:
-    """Observation space flattened into the leaves that get stored."""
-    if isinstance(space, gymnasium.spaces.Box):
-        return {_SINGLE: space}
-    if isinstance(space, gymnasium.spaces.Dict):
-        for key, leaf in space.spaces.items():
-            if not isinstance(leaf, gymnasium.spaces.Box):
-                raise TypeError(f"observation leaf {key!r} must be a Box, got {type(leaf).__name__}")
-        return dict(space.spaces)
-    raise TypeError(f"observation space must be Box or Dict of Boxes, got {type(space).__name__}")
 
 
 def _stacked_leaf(space, stack: int):
