@@ -218,7 +218,9 @@ if __name__ == "__main__":
     start_time = time.time()
     episode_returns = np.zeros(args.num_envs)
     next_obs, _ = envs.reset(seed=args.seed)
-    next_obs = torch.Tensor(next_obs).to(device)
+    # from_numpy keeps the observation uint8; torch.Tensor is an alias for FloatTensor and
+    # would widen it to float32 before the transfer, quadrupling every upload.
+    next_obs = torch.from_numpy(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
 
     for iteration in range(1, args.num_iterations + 1):
@@ -230,7 +232,7 @@ if __name__ == "__main__":
 
         for step in range(0, args.num_steps):
             global_step += args.num_envs
-            obs[step] = next_obs.cpu().to(torch.uint8)
+            obs[step] = next_obs.cpu()
             dones[step] = next_done
 
             # ALGO LOGIC: action logic
@@ -244,7 +246,8 @@ if __name__ == "__main__":
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
-            next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+            next_obs = torch.from_numpy(next_obs).to(device)
+            next_done = torch.Tensor(next_done).to(device)
 
             episode_returns += reward
             for i, done in enumerate(next_done.cpu().numpy().astype(bool)):
