@@ -25,6 +25,8 @@ Test sequence (requires exactly 2 environments):
   5. Truncation trigger: env 0 gets action 254, env 1 keeps action 5.
      → step result must have truncated[0]=1, all other flags 0.
   6. Post-reset obs: one normal step — env 0 sees reset_count=3 and reward 0.0.
+  7. Forced reset: client.reset() flags both envs, so reset_count becomes 4 and 2
+     and both get the reset-step contract.
 
 Usage:
     python scripts/inspect_autoreset.py [name]
@@ -82,7 +84,7 @@ with IPCClient(name) as client:
     # 1. First exchange — every env is reset before the first render, so the obs
     #    handed back by connect() must already satisfy the reset-step contract.
     # -------------------------------------------------------------------------
-    print("\n[1/6] Checking first-exchange obs...")
+    print("\n[1/7] Checking first-exchange obs...")
     echo0, rc0, se0 = _decode_scalar(state.scalar_obs[0])
     echo1, rc1, se1 = _decode_scalar(state.scalar_obs[1])
     check("first obs env0 reset_count == 1 (_reset ran)", np.isclose(rc0, 1.0))
@@ -97,7 +99,7 @@ with IPCClient(name) as client:
     # -------------------------------------------------------------------------
     # 2. Warm-up
     # -------------------------------------------------------------------------
-    print(f"\n[2/6] Warm-up ({WARM_UP_STEPS} steps)...")
+    print(f"\n[2/7] Warm-up ({WARM_UP_STEPS} steps)...")
     for _ in range(WARM_UP_STEPS):
         actions = np.array([[ENV_0_NORMAL_ACTION], [ENV_1_ACTION]], dtype=np.uint8)
         state = client.step(actions)
@@ -119,7 +121,7 @@ with IPCClient(name) as client:
     # -------------------------------------------------------------------------
     # 2. Termination trigger
     # -------------------------------------------------------------------------
-    print("\n[3/6] Sending termination sentinel (action=255) to env 0...")
+    print("\n[3/7] Sending termination sentinel (action=255) to env 0...")
     actions = np.array([[255], [ENV_1_ACTION]], dtype=np.uint8)
     state = client.step(actions)
 
@@ -139,7 +141,7 @@ with IPCClient(name) as client:
     # -------------------------------------------------------------------------
     # 3. Post-reset observation (env 0 was reset before this step was rendered)
     # -------------------------------------------------------------------------
-    print("\n[4/6] Reading post-termination-reset obs...")
+    print("\n[4/7] Reading post-termination-reset obs...")
     actions = np.array([[ENV_0_NORMAL_ACTION], [ENV_1_ACTION]], dtype=np.uint8)
     state = client.step(actions)
 
@@ -162,7 +164,7 @@ with IPCClient(name) as client:
     # -------------------------------------------------------------------------
     # 4. Truncation trigger
     # -------------------------------------------------------------------------
-    print("\n[5/6] Sending truncation sentinel (action=254) to env 0...")
+    print("\n[5/7] Sending truncation sentinel (action=254) to env 0...")
     actions = np.array([[254], [ENV_1_ACTION]], dtype=np.uint8)
     state = client.step(actions)
 
@@ -180,7 +182,7 @@ with IPCClient(name) as client:
     # -------------------------------------------------------------------------
     # 5. Post-truncation reset observation
     # -------------------------------------------------------------------------
-    print("\n[6/6] Reading post-truncation-reset obs...")
+    print("\n[6/7] Reading post-truncation-reset obs...")
     actions = np.array([[ENV_0_NORMAL_ACTION], [ENV_1_ACTION]], dtype=np.uint8)
     state = client.step(actions)
 
@@ -196,6 +198,26 @@ with IPCClient(name) as client:
     check("post-trunc env1 reset_count == 1 (never reset again)", np.isclose(rc1, 1.0))
     check("post-trunc env1 state_echo == RUNNING",              np.isclose(se1, 0.0))
     check("post-trunc env1 reward > 0 (not a reset step)",      state.rewards[1] > 0.0)
+
+    # -------------------------------------------------------------------------
+    # 7. Forced reset from Python — writes the terminated block in the opposite
+    #    direction, so Godot resets both envs at the top of its next exchange.
+    # -------------------------------------------------------------------------
+    print("\n[7/7] Forcing a reset from Python...")
+    state = client.reset()
+
+    echo0, rc0, se0 = _decode_scalar(state.scalar_obs[0])
+    echo1, rc1, se1 = _decode_scalar(state.scalar_obs[1])
+    check("forced reset env0 reset_count == 4",   np.isclose(rc0, 4.0))
+    check("forced reset env1 reset_count == 2",   np.isclose(rc1, 2.0))
+    check("forced reset env0 echo == 10.0",       np.isclose(echo0, 10.0))
+    check("forced reset env1 echo == 10.0",       np.isclose(echo1, 10.0))
+    check("forced reset env0 reward == 0.0",      state.rewards[0] == 0.0)
+    check("forced reset env1 reward == 0.0",      state.rewards[1] == 0.0)
+    # Godot overwrites the request bytes with the post-reset state, so the block
+    # reads as episode flags again by the time reset() returns.
+    check("forced reset terminated cleared",      not state.terminated.any())
+    check("forced reset truncated cleared",       not state.truncated.any())
 
 # -------------------------------------------------------------------------
 # Summary

@@ -44,7 +44,7 @@ class IPCClient:
     the first state, then opens the shared memory that is guaranteed to exist
     by that point.
 
-    The EnvState returned by connect() and step() holds numpy views directly
+    The EnvState returned by connect(), step() and reset() holds numpy views directly
     into the shared memory buffer — no per-step copies. The same EnvState
     instance is returned every call; its arrays are updated in-place by Godot
     between steps.
@@ -153,6 +153,31 @@ class IPCClient:
     def step(self, actions: np.ndarray) -> EnvState:
         """Write actions, signal Godot, wait for the next state, return it."""
         self._write_actions(actions)
+        self._act_ready.release()
+        self._env_ready.acquire()
+        return self._state
+
+    def reset(self, mask: np.ndarray | None = None) -> EnvState:
+        """Force a reset of the flagged envs (all of them when mask is None).
+
+        The request is written into the terminated block — the same bytes Godot
+        reads at the top of its next exchange to decide what to reset, used here
+        in the opposite direction. Godot overwrites them with the post-reset
+        episode state before this call returns.
+
+        Costs one exchange: obs_0 only exists once Godot has rendered it. Actions
+        are zeroed, since anything dispatched into the outgoing episode is wiped
+        by the reset.
+        """
+        if self._state is None:
+            raise RuntimeError("reset() called before connect()")
+
+        if mask is None:
+            self._state.terminated[:] = 1
+        else:
+            self._state.terminated[:] = np.asarray(mask, dtype=np.uint8)
+
+        self._actions_buf[:] = 0
         self._act_ready.release()
         self._env_ready.acquire()
         return self._state

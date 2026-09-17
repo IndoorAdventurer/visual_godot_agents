@@ -93,10 +93,10 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ) -> tuple[Any, dict]:
+        # TODO: seed is ignored — forwarding it needs its own IPC channel and a
+        # GDScript-side API for consuming it.
         if self._connected:
-            # TODO: implement a proper forced-reset signal over IPC so callers
-            # can reset mid-episode. For now, Godot handles per-env auto-reset
-            # and CleanRL only calls reset() once at startup, so this is fine.
+            self._state = self._client.reset()
             return self._get_obs(), {}
 
         self._state = self._client.connect()

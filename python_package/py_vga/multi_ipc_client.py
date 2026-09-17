@@ -22,7 +22,7 @@ class MultiIPCClient:
     """
     Unified client for one or more Godot instances.
 
-    Presents the same connect() / step() / close() interface as IPCClient.
+    Presents the same connect() / step() / reset() / close() interface as IPCClient.
     Layout attributes (num_envs, visual_width, visual_height, visual_channels,
     scalar_obs_size, action_size) are populated after connect().
     """
@@ -102,6 +102,17 @@ class MultiIPCClient:
         n = self._envs_per_shard
         shard_states = self._run_parallel(
             lambda shard, i=None: shard.step(actions[i * n:(i + 1) * n]),
+            pass_index=True,
+        )
+        return self._merge(shard_states)
+
+    def reset(self, mask: np.ndarray | None = None) -> EnvState:
+        """Force a reset on every shard, wait for results, return a fresh combined state."""
+        n = self._envs_per_shard
+        shard_states = self._run_parallel(
+            lambda shard, i=None: shard.reset(
+                None if mask is None else mask[i * n:(i + 1) * n]
+            ),
             pass_index=True,
         )
         return self._merge(shard_states)
