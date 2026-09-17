@@ -104,6 +104,7 @@
 			<return type="float" />
 			<description>
 				You must override this. Return the reward earned during this step. The default returns 0.0.
+				Not called on a reset step. The first observation of an episode is not the result of a transition, so [VGAMasterNode] reports a reward of 0.0 for it without calling this.
 			</description>
 		</method>
 		<method name="_get_episode_state" qualifiers="virtual">
@@ -111,12 +112,13 @@
 			<description>
 				You must override this. Return the current episode state: [constant TERMINATED] when the episode ends naturally (goal reached, failure, etc.), [constant TRUNCATED] when it ends artificially (time limit, out-of-bounds guard, etc.), or [constant RUNNING] otherwise. The default returns [constant RUNNING], so episodes never end.
 				[VGAMasterNode] reads this each step and automatically resets the environment before collecting the next observation when the state is not [constant RUNNING], so [method _reset] will always be called before the next [method _collect_scalar_obs].
+				Not called on a reset step either: [VGAMasterNode] reports [constant RUNNING] for the first observation of an episode without calling this.
 			</description>
 		</method>
 		<method name="_reset" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				You must override this. Reset the environment to its initial state for a new episode. Called automatically by [VGAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
+				You must override this. Reset the environment to its initial state for a new episode. Called automatically by [VGAMasterNode] whenever [method _get_episode_state] returns a non-[constant RUNNING] value, and once before the first observation is collected, so every episode starts the same way. Must also clear the episode state back to [constant RUNNING] so the next step is collected correctly.
 			</description>
 		</method>
 	</methods>

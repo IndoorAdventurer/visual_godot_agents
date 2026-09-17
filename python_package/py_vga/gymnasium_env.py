@@ -1,7 +1,10 @@
 """
 GodotVectorEnv — gymnasium.vector.VectorEnv wrapper around MultiIPCClient.
 
-Plug-and-play with CleanRL and other gymnasium-compatible training loops.
+Plug-and-play with gymnasium-compatible training loops that honour
+metadata["autoreset_mode"]. Loops written against SAME_STEP autoreset — CleanRL's
+PPO reference implementations among them — need their GAE masking adjusted: a done
+flag here marks the TERMINAL observation, so the new episode begins on the next one.
 All action encoding/decoding happens internally; callers work with native
 gymnasium spaces throughout.
 
@@ -15,6 +18,7 @@ Discrete          — single uint8; action_size must equal 1
 import numpy as np
 import gymnasium
 import gymnasium.spaces.utils as gym_utils
+from gymnasium.vector import AutoresetMode
 from gymnasium.vector.utils import batch_space
 from typing import Any
 
@@ -30,7 +34,16 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
 
     If godot_binary is None, Godot is not launched — the caller is responsible
     for starting it manually before calling reset() (only valid for num_instances=1).
+
+    Autoreset is NEXT_STEP: a done flag arrives with the terminal observation, and
+    the first observation of the new episode follows on the next step() with reward
+    0.0 and both flags false.
     """
+
+    # Subclasses extend this with {**GodotVectorEnv.metadata, ...}; __init__ gives
+    # each instance its own copy, so in-place edits stay local to that instance.
+    metadata = {"autoreset_mode": AutoresetMode.NEXT_STEP}
+    autoreset_mode = AutoresetMode.NEXT_STEP
 
     def __init__(
         self,
@@ -49,6 +62,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
     ):
         # gymnasium 1.x VectorEnv.__init__ takes no args; set required attributes directly.
         super().__init__()
+        self.metadata = dict(self.metadata)
         self.num_envs = num_envs
         self.single_observation_space = observation_space
         self.single_action_space = action_space

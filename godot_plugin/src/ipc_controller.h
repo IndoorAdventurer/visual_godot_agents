@@ -37,14 +37,18 @@ namespace godot {
         IPCGpu d_gpu;           // Responsible for all GPU readback
 
         // Layout, etc:
-        size_t d_num_envs          = 0;
-        uint32_t d_visual_width    = 0;
-        uint32_t d_visual_height   = 0;
-        uint32_t d_visual_channels = 0;
-        size_t d_visual_obs_size   = 0;  // width * height * channels
-        size_t d_scalar_obs_size   = 0;
-        size_t d_action_size       = 0;
+        size_t d_num_envs            = 0;
+        uint32_t d_visual_width      = 0;
+        uint32_t d_visual_height     = 0;
+        uint32_t d_visual_channels   = 0;
+        size_t d_visual_obs_size     = 0;  // width * height * channels
+        size_t d_scalar_obs_size     = 0;
+        size_t d_action_size         = 0;
         std::vector<VGAAgentNode *> d_agents;
+
+        // To check if env is at step 0:
+        std::vector<uint8_t> d_was_reset;
+        bool d_first_exchange        = true;
 
         // Byte offsets into shared memory, fixed after initialize():
         size_t d_visual_obs_offset   = 0;
@@ -112,6 +116,8 @@ namespace godot {
              * Writes the header and all per-env outgoing data (scalar obs, reward,
              * terminated/truncated flags) into shared memory. The visual obs section
              * is left untouched — _render_and_fetch writes there directly.
+             * Envs flagged in d_was_reset report reward 0 and RUNNING; their
+             * get_reward() and get_episode_state() are not called.
              */
             void _write_env_state() const;
 

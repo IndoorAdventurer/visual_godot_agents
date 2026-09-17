@@ -45,6 +45,8 @@ bool IPCController::initialize(
     d_action_size     = action_size;
     d_agents          = agents;
 
+    d_was_reset.resize(num_envs);
+
     d_gpu_data_size   = gpu_data_size;
 
     d_visual_obs_offset  = sizeof(Header);
@@ -80,9 +82,12 @@ bool IPCController::exchange(double p_delta) {
     // the render fires before world._physics_process runs and before physics integrates.
     const uint8_t *shm_base = static_cast<const uint8_t *>(d_posix.get_shm_ptr());
     for (size_t i = 0; i != d_num_envs; ++i) {
-        if (shm_base[d_terminated_offset + i] || shm_base[d_truncated_offset + i])
+        d_was_reset[i] = d_first_exchange || shm_base[d_terminated_offset + i]
+                                          || shm_base[d_truncated_offset + i];
+        if (d_was_reset[i])
             d_agents[i]->reset();
     }
+    d_first_exchange = false;
 
     VGA_PROFILE_PUSH("render_and_fetch");
     ERR_FAIL_COND_V_MSG(!_render_and_fetch(p_delta), false,
@@ -148,10 +153,13 @@ void IPCController::_write_env_state() const {
                         obs.ptr(), d_scalar_obs_size);
         }
 
-        float reward = agent->get_reward();
+        // Gymnasium's NEXT_STEP convention: r_0 must be zero:
+        float reward = d_was_reset[i] ? 0.0f : agent->get_reward();
         std::memcpy(rewards_base + i * sizeof(float), &reward, sizeof(float));
 
-        VGAAgentNode::EpisodeState state = agent->get_episode_state();
+        // Ditto: obs_0 always starts a running episode.
+        VGAAgentNode::EpisodeState state =
+            d_was_reset[i] ? VGAAgentNode::RUNNING : agent->get_episode_state();
         terminated_base[i] = (state == VGAAgentNode::TERMINATED) ? 1 : 0;
         truncated_base[i]  = (state == VGAAgentNode::TRUNCATED)  ? 1 : 0;
     }
