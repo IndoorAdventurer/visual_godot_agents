@@ -61,6 +61,28 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         step_rate_hz: int | None = None,
         extra_args: dict[str, str] | None = None,
     ):
+        """
+        Args:
+            name: IPC identifier; must match ipc_name on the Godot VGAMasterNode.
+                With num_instances > 1 each shard gets a "<name>_<i>" suffix.
+            num_envs: Total environments across all instances. Must divide evenly
+                by num_instances.
+            observation_space: Per-environment space. Box for visual-only, or
+                Dict{"visual": Box, "scalar": Box} with include_scalar_obs=True.
+                Cross-checked against Godot's header on the first reset().
+            action_space: Per-environment Box, MultiDiscrete or Discrete.
+            include_scalar_obs: Whether the env also reports a scalar block.
+            num_instances: Godot processes to shard num_envs across. Requires
+                godot_binary above 1.
+            godot_binary: Godot executable to launch. None means the caller starts
+                Godot itself, which is only valid for num_instances=1.
+            project_path: Passed as --path; omit for an exported executable.
+            obs_width, obs_height, obs_channels, step_rate_hz: VGAMasterNode
+                property overrides, forwarded only when not None. Godot otherwise
+                uses whatever the scene sets.
+            extra_args: Further key=value pairs forwarded to Godot, readable there
+                via VGAMasterNode.get_user_args().
+        """
         # gymnasium 1.x VectorEnv.__init__ takes no args; set required attributes directly.
         super().__init__()
         self.metadata = dict(self.metadata)

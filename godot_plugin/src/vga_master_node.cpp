@@ -19,7 +19,7 @@ VGAMasterNode::VGAMasterNode()
     d_obs_res(128, 128),
     d_obs_channels(4),
     d_ipc_name("vga"),
-    d_step_rate_hz(60),
+    d_step_rate_hz(30),
     d_initialized(false)
 {}
 
