@@ -30,6 +30,9 @@
 		<member name="obs_resolution" type="Vector2i" setter="set_obs_res" getter="get_obs_res" default="Vector2i(128, 128)">
 			Width and height of the visual observation rendered by each SubViewport. Determines the size of the visual observation block in shared memory.
 		</member>
+		<member name="obs_channels" type="int" setter="set_obs_channels" getter="get_obs_channels" default="4">
+			Bytes per pixel of the visual observation handed to Python, 1 to 4. SubViewports always render RGBA8; this truncates the readback, so 1 keeps R, 2 keeps RG, 3 keeps RGB. Lowering it shrinks the visual observation block in shared memory and the per-step PCIe transfer proportionally.
+		</member>
 		<member name="ipc_name" type="String" setter="set_ipc_name" getter="get_ipc_name" default="&quot;vga&quot;">
 			Identifier used to name the POSIX shared memory region ([code]/[ipc_name][/code]) and semaphores ([code]/[ipc_name]_env_ready[/code], [code]/[ipc_name]_act_ready[/code]). Must match the name used on the Python side.
 		</member>

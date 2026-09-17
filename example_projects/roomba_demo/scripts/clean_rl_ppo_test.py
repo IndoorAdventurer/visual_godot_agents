@@ -48,6 +48,9 @@ class Args:
     obs_width: int = 64
     """observation viewport width in pixels"""
     obs_height: int = 64
+    """the height of the visual observation"""
+    obs_channels: int = 3
+    """observation channels read back from Godot: R=depth, G=filth, B=path"""
     """observation viewport height in pixels"""
     step_rate_hz: int | None = None
     """physics step rate; None lets Godot run uncapped"""
@@ -104,8 +107,8 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class Agent(nn.Module):
     def __init__(self, envs):
         super().__init__()
-        obs_shape = envs.single_observation_space.shape  # (H, W, 4) — alpha dropped in _preprocess
-        n_channels = 3  # RGB only; alpha discarded before entering the CNN
+        obs_shape = envs.single_observation_space.shape  # (H, W, C)
+        n_channels = obs_shape[2]
         self.encoder = nn.Sequential(
             layer_init(nn.Conv2d(n_channels, 32, kernel_size=8, stride=4)),
             nn.ReLU(),
@@ -128,8 +131,8 @@ class Agent(nn.Module):
         self.critic = layer_init(nn.Linear(512, 1), std=1.0)
 
     def _preprocess(self, x):
-        # (N, H, W, 4) uint8 → (N, 3, H, W) float32 in [0, 1]; drop unused alpha channel
-        return x[..., :3].permute(0, 3, 1, 2).float() / 255.0
+        # (N, H, W, C) uint8 → (N, C, H, W) float32 in [0, 1]
+        return x.permute(0, 3, 1, 2).float() / 255.0
 
     def _features(self, x):
         return self.fc(self.encoder(self._preprocess(x)))
@@ -182,7 +185,11 @@ if __name__ == "__main__":
 
     # env setup
     # 4 channels (RGBA) to match Godot's readback; alpha is unused — dropped in Agent._preprocess
-    obs_space = gym.spaces.Box(low=0, high=255, shape=(args.obs_height, args.obs_width, 4), dtype=np.uint8)
+    obs_space = gym.spaces.Box(
+        low=0, high=255,
+        shape=(args.obs_height, args.obs_width, args.obs_channels),
+        dtype=np.uint8,
+    )
     # 3 continuous actions (forward/back, strafe, turn); bounds are informational — PPO samples unboundedly
     act_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
     envs = GodotVectorEnv(
@@ -195,6 +202,7 @@ if __name__ == "__main__":
         project_path=args.project_path or None,
         obs_width=args.obs_width,
         obs_height=args.obs_height,
+        obs_channels=args.obs_channels,
         step_rate_hz=args.step_rate_hz,
     )
 

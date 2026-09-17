@@ -17,6 +17,7 @@ VGAMasterNode::VGAMasterNode()
     d_env_scene(),
     d_num_envs(2),
     d_obs_res(128, 128),
+    d_obs_channels(4),
     d_ipc_name("vga"),
     d_step_rate_hz(60),
     d_initialized(false)
@@ -40,7 +41,8 @@ void VGAMasterNode::_ready() {
         return;
     }
 
-    if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res, 4, agents, subviewports)) {
+    if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res,
+                          static_cast<uint32_t>(d_obs_channels), agents, subviewports)) {
         ERR_PRINT("VGAMasterNode: IPCController initialization failed. Quitting.");
         _discard_envs(subviewports);
         get_tree()->quit();
@@ -83,6 +85,9 @@ PackedStringArray VGAMasterNode::_get_configuration_warnings() const {
     if (d_obs_res.x <= 0 or d_obs_res.y < 0)
         warnings.push_back("Observation space resolution must be positive.");
 
+    if (d_obs_channels < 1 or d_obs_channels > 4)
+        warnings.push_back("Observation channels must be between 1 and 4.");
+
     return warnings;
 }
 
@@ -111,6 +116,15 @@ void VGAMasterNode::set_obs_res(Vector2i p_res) {
 
 Vector2i VGAMasterNode::get_obs_res() const {
     return d_obs_res;
+}
+
+void VGAMasterNode::set_obs_channels(int p_channels) {
+    d_obs_channels = p_channels;
+    update_configuration_warnings();
+}
+
+int VGAMasterNode::get_obs_channels() const {
+    return d_obs_channels;
 }
 
 void VGAMasterNode::set_ipc_name(const String &p_name) {
@@ -170,6 +184,15 @@ void VGAMasterNode::_bind_methods() {
             Variant::VECTOR2I, "obs_resolution"),
             "set_obs_res", "get_obs_res");
 
+    // Observation channels:
+    ClassDB::bind_method(
+        D_METHOD("set_obs_channels", "p_channels"), &VGAMasterNode::set_obs_channels);
+    ClassDB::bind_method(
+        D_METHOD("get_obs_channels"), &VGAMasterNode::get_obs_channels);
+    ADD_PROPERTY(
+        PropertyInfo(Variant::INT, "obs_channels", PROPERTY_HINT_RANGE, "1,4,1"),
+        "set_obs_channels", "get_obs_channels");
+
     // IPC name:
     ClassDB::bind_method(
         D_METHOD("set_ipc_name", "p_name"), &VGAMasterNode::set_ipc_name);
@@ -207,6 +230,7 @@ void VGAMasterNode::_apply_cmdline_args() {
         else if (key == "num_envs")     d_num_envs      = val.to_int();
         else if (key == "obs_width")    d_obs_res.x     = val.to_int();
         else if (key == "obs_height")   d_obs_res.y     = val.to_int();
+        else if (key == "obs_channels") d_obs_channels  = val.to_int();
         else if (key == "step_rate_hz") d_step_rate_hz  = val.to_int();
         else                            d_user_args[key] = val;
     }

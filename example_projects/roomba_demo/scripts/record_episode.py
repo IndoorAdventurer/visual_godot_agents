@@ -34,6 +34,7 @@ class Args:
     obs_width: int = 64
     """must match the width used during training"""
     obs_height: int = 64
+    obs_channels: int = 3
     """must match the height used during training"""
     scale: int = 4
     """nearest-neighbour upscale factor (default 4 → 256×256)"""
@@ -45,7 +46,11 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    obs_space = gym.spaces.Box(low=0, high=255, shape=(args.obs_height, args.obs_width, 4), dtype=np.uint8)
+    obs_space = gym.spaces.Box(
+        low=0, high=255,
+        shape=(args.obs_height, args.obs_width, args.obs_channels),
+        dtype=np.uint8,
+    )
     act_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
 
     envs = GodotVectorEnv(
@@ -58,6 +63,7 @@ if __name__ == "__main__":
         project_path=args.project_path or None,
         obs_width=args.obs_width,
         obs_height=args.obs_height,
+        obs_channels=args.obs_channels,
     )
 
     agent = Agent(envs).to(device)
@@ -74,7 +80,7 @@ if __name__ == "__main__":
     frames = 0
 
     while True:
-        # obs is (1, H, W, 4) uint8 — drop alpha, convert RGB→BGR for OpenCV
+        # obs is (1, H, W, C) uint8 — cvtColor needs exactly 3, so trim any extra
         frame_rgb = obs[0, :, :, :3]
         frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
         frame_up = cv2.resize(frame_bgr, (out_w, out_h), interpolation=cv2.INTER_NEAREST)

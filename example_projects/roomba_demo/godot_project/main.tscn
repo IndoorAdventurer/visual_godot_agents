@@ -4,4 +4,4 @@
 
 [node name="VGAMasterNode" type="VGAMasterNode" unique_id=827244961]
 environment_scene = ExtResource("1_ig7tw")
-obs_resolution = Vector2i(512, 512)
+obs_channels = 3

@@ -31,6 +31,11 @@ bool IPCController::initialize(
         "IPCController: _get_gpu_data_size() must be a multiple of 4 "
         "(std430 array stride), got " + itos(gpu_data_size) + ".");
 
+    // RGBA8 is always read back; channels beyond this count are discarded.
+    ERR_FAIL_COND_V_MSG(
+        visual_channels < 1 || visual_channels > 4, false,
+        "IPCController: visual_channels must be 1-4, got " + itos(visual_channels) + ".");
+
     // scalar_obs_size may be 0 — environments driven purely by visual obs skip
     // the scalar block entirely.
     ERR_FAIL_COND_V_MSG(action_size == 0, false,

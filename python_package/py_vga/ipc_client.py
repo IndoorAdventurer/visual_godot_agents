@@ -98,6 +98,7 @@ class IPCClient:
         num_envs: int | None = None,
         obs_width: int | None = None,
         obs_height: int | None = None,
+        obs_channels: int | None = None,
         step_rate_hz: int | None = None,
         extra_args: dict[str, str] | None = None,
     ) -> None:
@@ -109,8 +110,8 @@ class IPCClient:
         forwarded so Godot connects to this client's shared memory region.
 
         VGAMasterNode property overrides (num_envs, obs_width, obs_height,
-        step_rate_hz) are only forwarded when not None — Godot falls back to
-        whatever is set in the scene inspector otherwise.
+        obs_channels, step_rate_hz) are only forwarded when not None — Godot
+        falls back to whatever is set in the scene inspector otherwise.
 
         On headless systems (HPC/SLURM) the caller is responsible for providing
         a valid DISPLAY, e.g. by running the whole job under `xvfb-run -a`.
@@ -127,6 +128,8 @@ class IPCClient:
             passthrough["obs_width"] = str(obs_width)
         if obs_height is not None:
             passthrough["obs_height"] = str(obs_height)
+        if obs_channels is not None:
+            passthrough["obs_channels"] = str(obs_channels)
         if step_rate_hz is not None:
             passthrough["step_rate_hz"] = str(step_rate_hz)
         if extra_args:

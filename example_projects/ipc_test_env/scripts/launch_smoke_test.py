@@ -24,6 +24,7 @@ parser.add_argument("--project-path", default=None)
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--obs-width", type=int, default=None)
 parser.add_argument("--obs-height", type=int, default=None)
+parser.add_argument("--obs-channels", type=int, default=None)
 parser.add_argument("--step-rate-hz", type=int, default=None)
 parser.add_argument("--steps", type=int, default=20)
 parser.add_argument("--scenario", default="test")
@@ -37,6 +38,7 @@ with IPCClient("vga") as client:
         num_envs=args.num_envs,
         obs_width=args.obs_width,
         obs_height=args.obs_height,
+        obs_channels=args.obs_channels,
         step_rate_hz=args.step_rate_hz,
         extra_args={"scenario": args.scenario},
     )

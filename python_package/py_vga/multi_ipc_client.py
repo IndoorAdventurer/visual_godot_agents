@@ -36,6 +36,7 @@ class MultiIPCClient:
         project_path: str | None = None,
         obs_width: int | None = None,
         obs_height: int | None = None,
+        obs_channels: int | None = None,
         step_rate_hz: int | None = None,
         extra_args: dict[str, str] | None = None,
     ):
@@ -77,6 +78,7 @@ class MultiIPCClient:
                     num_envs=self._envs_per_shard,
                     obs_width=obs_width,
                     obs_height=obs_height,
+                    obs_channels=obs_channels,
                     step_rate_hz=step_rate_hz,
                     extra_args=extra_args,
                 )

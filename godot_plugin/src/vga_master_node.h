@@ -25,6 +25,7 @@ namespace godot {
         Ref<PackedScene> d_env_scene; // The scene representing the simulation
         int d_num_envs;               // Number of parallel environments
         Vector2i d_obs_res;           // Resolution of observation space
+        int d_obs_channels;           // Bytes per pixel handed to Python (1-4, RGBA order)
         String d_ipc_name;            // Shared name for SHM region and semaphores
         int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
         Dictionary d_user_args;       // Parsed cmdline args not consumed by VGAMasterNode; exposed to GDScript
@@ -46,6 +47,8 @@ namespace godot {
             int get_num_envs() const;
             void set_obs_res(Vector2i p_res);
             Vector2i get_obs_res() const;
+            void set_obs_channels(int p_channels);
+            int get_obs_channels() const;
             void set_ipc_name(const String &p_name);
             String get_ipc_name() const;
             void set_step_rate_hz(int p_hz);

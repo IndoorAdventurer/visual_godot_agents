@@ -61,6 +61,7 @@ def _run_profile(
     num_envs: int,
     obs_width: int | None,
     obs_height: int | None,
+    obs_channels: int | None,
     steps: int,
 ) -> dict:
     with IPCClient(ipc_name) as client:
@@ -70,6 +71,7 @@ def _run_profile(
             num_envs=num_envs,
             obs_width=obs_width,
             obs_height=obs_height,
+            obs_channels=obs_channels,
         )
 
         print(f"    Waiting for Godot ({num_envs} envs)...")
@@ -125,6 +127,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name",     default="vga",
                    help="IPC name passed to Godot")
     p.add_argument("--obs-width",  type=int, default=None)
+    p.add_argument("--obs-channels", type=int, default=None)
     p.add_argument("--obs-height", type=int, default=None)
     return p
 
@@ -153,6 +156,7 @@ def main() -> None:
                 num_envs=num_envs,
                 obs_width=args.obs_width,
                 obs_height=args.obs_height,
+                obs_channels=args.obs_channels,
                 steps=args.steps,
             )
 

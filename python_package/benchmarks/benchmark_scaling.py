@@ -60,6 +60,7 @@ def _run_single(
     num_envs: int,
     obs_width: int | None,
     obs_height: int | None,
+    obs_channels: int | None,
     warmup_steps: int,
     measured_steps: int,
     random_actions: bool,
@@ -75,6 +76,7 @@ def _run_single(
             num_envs=num_envs,
             obs_width=obs_width,
             obs_height=obs_height,
+            obs_channels=obs_channels,
         )
 
         print(f"    Waiting for Godot ({num_envs} envs)...")
@@ -153,6 +155,7 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Send seeded random actions instead of zeros, so episode "
                         "logic (termination, reset) actually runs.")
     p.add_argument("--obs-width",  type=int, default=None)
+    p.add_argument("--obs-channels", type=int, default=None)
     p.add_argument("--obs-height", type=int, default=None)
     return p
 
@@ -184,6 +187,7 @@ def main() -> None:
                     num_envs=num_envs,
                     obs_width=args.obs_width,
                     obs_height=args.obs_height,
+                    obs_channels=args.obs_channels,
                     warmup_steps=args.warmup,
                     measured_steps=args.steps,
                     random_actions=args.random_actions,
