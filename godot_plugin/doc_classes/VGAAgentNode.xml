@@ -104,6 +104,7 @@
 			<return type="float" />
 			<description>
 				You must override this. Return the reward earned during this step. The default returns 0.0.
+				No delta is passed: the simulation runs at a fixed step rate, so [method Node.get_physics_process_delta_time] returns [code]1 / step_rate_hz[/code] for the whole run. Scale rate-like terms by it to keep them invariant to [member VGAMasterNode.step_rate_hz].
 				Not called on a reset step. The first observation of an episode is not the result of a transition, so [VGAMasterNode] reports a reward of 0.0 for it without calling this.
 			</description>
 		</method>
