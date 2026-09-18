@@ -22,12 +22,11 @@ Observations are returned in their native dtype — scale them in the policy.
 
 torch and gymnasium are optional dependencies of py_vga, so import directly:
 
-    from py_vga.indexed_frame_stack import IndexedFrameStack
+    from py_vga.indexed_frame_stack import IndexedFrameStack, ppo_capacity
 """
 
 # TODO: SAC support — a next_obs lookup (handle + 1, stopping at episode boundaries)
 #       and a ring sized for replay rather than a single rollout.
-# TODO: helper to derive `capacity` from num_steps, stack and stride.
 
 import gymnasium
 import numpy as np
@@ -46,7 +45,7 @@ class IndexedFrameStack(VectorWrapper):
         env: vector env whose single observation space is a Box, or a Dict of Boxes;
             every leaf is stacked independently.
         capacity: timesteps of frames to retain. Must exceed (stack - 1) * stride.
-            For PPO: num_steps + (stack - 1) * stride.
+            For PPO use ppo_capacity(num_steps, stack=stack, stride=stride).
         stack: frames per observation; 1 disables stacking.
         stride: gap between stacked frames; 1 is consecutive, n takes every nth.
         padding: fill for a stack reaching past an episode start, "repeat" or "zero".
@@ -78,7 +77,7 @@ class IndexedFrameStack(VectorWrapper):
         if capacity <= self.hist:
             raise ValueError(
                 f"capacity must exceed (stack - 1) * stride = {self.hist}, got {capacity}. "
-                f"For PPO use num_steps + {self.hist}."
+                f"For PPO use ppo_capacity(num_steps, stack={stack}, stride={stride})."
             )
         self.capacity = capacity
 
@@ -201,9 +200,11 @@ class IndexedFrameStack(VectorWrapper):
         Drop the retained rollout, keeping the frames needed to keep stacking across
         the boundary into the next one. Call after the update epochs.
 
-        Handles are not reset, so anything from the discarded rollout raises after.
+        The newest handle stays resolvable, since it carries into the next rollout as
+        its first observation. Handles are not reset, so older ones raise after.
         """
-        self._floor_t = max(0, self._newest_t + 1 - self.hist)
+        # hist + 1 frames: resolving the newest handle reads _newest_t - hist as well.
+        self._floor_t = max(0, self._newest_t - self.hist)
 
     @property
     def nbytes(self) -> int:
@@ -236,6 +237,16 @@ class IndexedFrameStack(VectorWrapper):
 
         self._newest_t = t
         return t * self.num_envs + np.arange(self.num_envs, dtype=np.int64)
+
+
+def ppo_capacity(num_steps: int, *, stack: int = 1, stride: int = 1) -> int:
+    """
+    Capacity for a PPO-style loop collecting `num_steps` frames per rollout.
+
+    Room for the rollout plus the frames reached by the handle carried into the next
+    one. Pass the same `stack` and `stride` as to IndexedFrameStack.
+    """
+    return num_steps + (stack - 1) * stride + 1
 
 
 def _stacked_leaf(space, stack: int):

@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from gymnasium.vector.utils import batch_space
 
-from py_vga.indexed_frame_stack import IndexedFrameStack
+from py_vga.indexed_frame_stack import IndexedFrameStack, ppo_capacity
 from py_vga.naive_frame_stack import NaiveFrameStack
 
 N = 2  # envs
@@ -222,11 +222,40 @@ h = run(w, env, 6)
 old = h[2].copy()
 w.clear()
 expect_raises("stale handle raises", IndexError, lambda: w.get_obs(old))
+# The newest handle is the next rollout's first observation, so it must still resolve.
+check("newest handle survives clear()", vals(w.get_obs(h[5]), 3), [[13, 14, 15], [23, 24, 25]])
 # Continue collecting; stacks must still reach back across the boundary.
 env.next_done = np.zeros(N, dtype=bool)
 env.next_obs = image_obs(6)
 h6, _, _, _, _ = w.step(np.zeros(N))
 check("history survived clear()", vals(w.get_obs(h6), 3), [[14, 15, 16], [24, 25, 26]])
+
+print("\nppo_capacity holds a rollout plus the handle carried into it")
+num_steps, stack, stride = 4, 3, 1
+check("ppo_capacity formula", ppo_capacity(num_steps, stack=stack, stride=stride), 4 + 2 + 1)
+check("ppo_capacity without stacking", ppo_capacity(num_steps), num_steps + 1)
+check("ppo_capacity with stride", ppo_capacity(num_steps, stack=3, stride=2), 4 + 4 + 1)
+
+
+def ppo_boundary(capacity):
+    """Run a rollout, clear, run another, then resolve the handle spanning the two."""
+    env, w = fresh(stack=stack, stride=stride, capacity=capacity)
+    h = run(w, env, num_steps + 1)  # reset records one frame, then num_steps steps
+    carried = h[-1].copy()
+    w.clear()
+    for t in range(num_steps + 1, 2 * num_steps + 1):
+        env.next_obs = image_obs(t)
+        w.step(np.zeros(N))
+    return lambda: w.get_obs(carried)
+
+
+sized = ppo_capacity(num_steps, stack=stack, stride=stride)
+check(
+    "carried handle resolves after the next rollout",
+    vals(ppo_boundary(sized)(), stack),
+    [[12, 13, 14], [22, 23, 24]],
+)
+expect_raises("one slot less evicts it", IndexError, ppo_boundary(sized - 1))
 
 print("\neviction and bad handles")
 env, w = fresh(stack=2, stride=1, capacity=5)
