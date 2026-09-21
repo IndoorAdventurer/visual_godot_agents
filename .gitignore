@@ -8,6 +8,7 @@
 *.dblite
 *.x86_64
 godot_plugin/src/gen/
+godot_plugin/compile_commands.json
 
 # Godot project is untracked until cleaned up; scripts alongside it are tracked:
 example_projects/ipc_test_env/godot_project/
