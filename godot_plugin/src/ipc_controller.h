@@ -58,6 +58,9 @@ namespace godot {
         size_t d_truncated_offset    = 0;
         size_t d_actions_offset      = 0;
 
+        // Present each drawn frame to the main window (real-time mode only):
+        bool d_present_frames = false;
+
         // GPU-side only — never enters shared memory or the Header:
         size_t d_gpu_data_size = 0;  // bytes per env; 0 disables the feature
 
@@ -82,6 +85,9 @@ namespace godot {
              * @param visual_channels   Output channels per pixel (1–4).
              * @param agents            One VGAAgentNode* per environment, in env order.
              * @param viewports         One subviewport per environment
+             * @param present_frames    Swap buffers after each draw. Required when the
+             *                          main window is meant to be watched, since the
+             *                          automatic render loop is disabled.
              */
             bool initialize(
                 const String &name,
@@ -89,7 +95,8 @@ namespace godot {
                 Vector2i visual_res,
                 uint32_t visual_channels,
                 const std::vector<VGAAgentNode *> &agents,
-                const std::vector<SubViewport *> &viewports
+                const std::vector<SubViewport *> &viewports,
+                bool present_frames
             );
 
             /**

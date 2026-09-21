@@ -13,7 +13,8 @@ bool IPCController::initialize(
     Vector2i visual_res,
     uint32_t visual_channels,
     const std::vector<VGAAgentNode *> &agents,
-    const std::vector<SubViewport *> &viewports
+    const std::vector<SubViewport *> &viewports,
+    bool present_frames
 )
 {
     ERR_FAIL_COND_V_MSG(agents.empty(), false,
@@ -49,6 +50,7 @@ bool IPCController::initialize(
     d_scalar_obs_size = scalar_obs_size;
     d_action_size     = action_size;
     d_agents          = agents;
+    d_present_frames  = present_frames;
 
     d_was_reset.resize(num_envs);
 
@@ -127,7 +129,7 @@ bool IPCController::_render_and_fetch(double p_delta) {
     // For some reason force_draw stalls this thread till the rendering thread
     // is done, while the actual GPU doesn't finish till much later.
     // Don't know why we can't just return immediately.
-    RenderingServer::get_singleton()->force_draw(false, p_delta);
+    RenderingServer::get_singleton()->force_draw(d_present_frames, p_delta);
     uint8_t *shm = static_cast<uint8_t *>(d_posix.get_shm_ptr());
     return d_gpu.fetch_frame(shm + d_visual_obs_offset);
 }

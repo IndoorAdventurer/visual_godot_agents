@@ -12,7 +12,7 @@
 		<method name="get_user_args" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [VGAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], and [code]step_rate_hz[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
+				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [VGAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], [code]obs_channels[/code], [code]step_rate_hz[/code], and [code]real_time_mode[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
 				[codeblock]
 				var args = $VGAMasterNode.get_user_args()
 				var scenario = args.get("scenario", "id")
@@ -38,6 +38,10 @@
 		</member>
 		<member name="step_rate_hz" type="int" setter="set_step_rate_hz" getter="get_step_rate_hz" default="30">
 			Physics tick rate in Hz. The fixed time delta visible to agent logic and to Python's [code]env.step()[/code] is [code]1 / step_rate_hz[/code]. Named in Hz to match RL convention. All environment logic must use [method Node._physics_process] (or physics-mode equivalents such as physics-mode [Timer] nodes) — [method Node._process] receives a wall-clock delta scaled by [code]time_scale[/code] and is not suitable for simulation logic.
+		</member>
+		<member name="real_time_mode" type="bool" setter="set_real_time_mode" getter="get_real_time_mode" default="false">
+			Run the simulation at [member step_rate_hz] steps per real-time second and show the main window, for runs meant to be watched rather than trained on. Slower if Python cannot keep up. Agent logic and observations are unaffected.
+			The window shows the root viewport, which is empty unless your scene puts something there — environments render into SubViewports with their own [World3D]. A [TextureRect] bound to a SubViewport's texture is enough to see one.
 		</member>
 	</members>
 </class>

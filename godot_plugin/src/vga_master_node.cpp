@@ -20,6 +20,7 @@ VGAMasterNode::VGAMasterNode()
     d_obs_channels(4),
     d_ipc_name("vga"),
     d_step_rate_hz(30),
+    d_real_time_mode(false),
     d_initialized(false)
 {}
 
@@ -42,7 +43,8 @@ void VGAMasterNode::_ready() {
     }
 
     if (!d_ipc.initialize(d_ipc_name, static_cast<size_t>(d_num_envs), d_obs_res,
-                          static_cast<uint32_t>(d_obs_channels), agents, subviewports)) {
+                          static_cast<uint32_t>(d_obs_channels), agents, subviewports,
+                          d_real_time_mode)) {
         ERR_PRINT("VGAMasterNode: IPCController initialization failed. Quitting.");
         _discard_envs(subviewports);
         get_tree()->quit();
@@ -143,6 +145,14 @@ int VGAMasterNode::get_step_rate_hz() const {
     return d_step_rate_hz;
 }
 
+void VGAMasterNode::set_real_time_mode(bool p_enabled) {
+    d_real_time_mode = p_enabled;
+}
+
+bool VGAMasterNode::get_real_time_mode() const {
+    return d_real_time_mode;
+}
+
 Dictionary VGAMasterNode::get_user_args() const {
     return d_user_args;
 }
@@ -214,6 +224,15 @@ void VGAMasterNode::_bind_methods() {
     ADD_PROPERTY(
         PropertyInfo(Variant::INT, "step_rate_hz", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"),
         "set_step_rate_hz", "get_step_rate_hz");
+
+    // Real-time mode:
+    ClassDB::bind_method(
+        D_METHOD("set_real_time_mode", "p_enabled"), &VGAMasterNode::set_real_time_mode);
+    ClassDB::bind_method(
+        D_METHOD("get_real_time_mode"), &VGAMasterNode::get_real_time_mode);
+    ADD_PROPERTY(
+        PropertyInfo(Variant::BOOL, "real_time_mode"),
+        "set_real_time_mode", "get_real_time_mode");
 }
 
 void VGAMasterNode::_apply_cmdline_args() {
@@ -226,13 +245,14 @@ void VGAMasterNode::_apply_cmdline_args() {
         String key = arg.substr(0, eq);
         String val = arg.substr(eq + 1);
 
-        if      (key == "ipc_name")     d_ipc_name      = val;
-        else if (key == "num_envs")     d_num_envs      = val.to_int();
-        else if (key == "obs_width")    d_obs_res.x     = val.to_int();
-        else if (key == "obs_height")   d_obs_res.y     = val.to_int();
-        else if (key == "obs_channels") d_obs_channels  = val.to_int();
-        else if (key == "step_rate_hz") d_step_rate_hz  = val.to_int();
-        else                            d_user_args[key] = val;
+        if      (key == "ipc_name")       d_ipc_name      = val;
+        else if (key == "num_envs")       d_num_envs      = val.to_int();
+        else if (key == "obs_width")      d_obs_res.x     = val.to_int();
+        else if (key == "obs_height")     d_obs_res.y     = val.to_int();
+        else if (key == "obs_channels")   d_obs_channels  = val.to_int();
+        else if (key == "step_rate_hz")   d_step_rate_hz  = val.to_int();
+        else if (key == "real_time_mode") d_real_time_mode = val.to_int() != 0;
+        else                              d_user_args[key] = val;
     }
 }
 
@@ -246,7 +266,9 @@ void VGAMasterNode::_configure_sim_loop() {
     engine->set_time_scale(SIM_TIME_MULTIPLIER);
     engine->set_max_physics_steps_per_frame(1);
     engine->set_physics_jitter_fix(0.0);
-    engine->set_max_fps(0);
+    // One main-loop iteration is exactly one tick, so the frame limiter is a step
+    // limiter: capping it at step_rate_hz paces the simulation to the wall clock.
+    engine->set_max_fps(d_real_time_mode ? d_step_rate_hz : 0);
 
     // Belt-and-braces: assert the default; a project setting could override it.
     ERR_FAIL_COND_MSG(
@@ -254,9 +276,12 @@ void VGAMasterNode::_configure_sim_loop() {
         "VGAMasterNode: low_processor_usage_mode is enabled — this would sleep between "
         "iterations and break the sim-loop. Disable it in Project Settings.");
 
+    // Vsync also off in realtime mode. Else it would fight max_fps over pacing.
     DisplayServer::get_singleton()->window_set_vsync_mode(DisplayServer::VSYNC_DISABLED);
     // Shrink the main window to the minimum — output goes to SubViewports, not here.
-    DisplayServer::get_singleton()->window_set_size(Vector2i(1, 1));
+    // Real-time mode keeps the project's configured window size so it can be watched.
+    if (!d_real_time_mode)
+        DisplayServer::get_singleton()->window_set_size(Vector2i(1, 1));
     get_tree()->set_physics_interpolation_enabled(false);
     // Kill the automatic render loop; we drive rendering manually via force_draw().
     RenderingServer::get_singleton()->set_render_loop_enabled(false);

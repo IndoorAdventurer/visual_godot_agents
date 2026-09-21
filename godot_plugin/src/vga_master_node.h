@@ -28,6 +28,7 @@ namespace godot {
         int d_obs_channels;           // Bytes per pixel handed to Python (1-4, RGBA order)
         String d_ipc_name;            // Shared name for SHM region and semaphores
         int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
+        bool d_real_time_mode;        // Pace the loop to the wall clock and present a window
         Dictionary d_user_args;       // Parsed cmdline args not consumed by VGAMasterNode; exposed to GDScript
 
         IPCController d_ipc;          // Responsible for all IPC with Python
@@ -53,6 +54,8 @@ namespace godot {
             String get_ipc_name() const;
             void set_step_rate_hz(int p_hz);
             int get_step_rate_hz() const;
+            void set_real_time_mode(bool p_enabled);
+            bool get_real_time_mode() const;
             Dictionary get_user_args() const;
 
         protected:
