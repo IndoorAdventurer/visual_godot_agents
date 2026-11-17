@@ -139,6 +139,20 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
             self._decode_info(self._state.info),
         )
 
+    def send_message(
+        self, data: bytes | np.ndarray, env_idx: int | np.ndarray | None = None
+    ) -> None:
+        """
+        Queue a message for the selected envs, delivered with the next step() or
+        reset(). Requires a prior reset().
+
+        env_idx is None (all envs), an int, an index array or a bool mask.
+        data is uint8 or bytes: (message_size,) goes to every selected env,
+        (k, message_size) gives one row per selected env. A second message to the
+        same env before delivery replaces the first.
+        """
+        self._client.send_message(data, env_idx)
+
     def close(self) -> None:
         self._client.close()
 

@@ -15,7 +15,7 @@ import atexit
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
-from .ipc_client import IPCClient, EnvState
+from .ipc_client import IPCClient, EnvState, _as_message, _env_indices
 
 
 class MultiIPCClient:
@@ -24,7 +24,8 @@ class MultiIPCClient:
 
     Presents the same connect() / step() / reset() / close() interface as IPCClient.
     Layout attributes (num_envs, visual_width, visual_height, visual_channels,
-    scalar_obs_size, action_size, info_size) are populated after connect().
+    scalar_obs_size, action_size, info_size, message_size) are populated after
+    connect().
     """
 
     def __init__(
@@ -70,6 +71,7 @@ class MultiIPCClient:
         self.scalar_obs_size = 0
         self.action_size     = 0
         self.info_size       = 0
+        self.message_size    = 0
 
         if godot_binary is not None:
             for i, shard in enumerate(self._shards):
@@ -98,6 +100,7 @@ class MultiIPCClient:
         self.scalar_obs_size = s0.scalar_obs_size
         self.action_size     = s0.action_size
         self.info_size       = s0.info_size
+        self.message_size    = s0.message_size
 
         return self._merge(shard_states)
 
@@ -109,6 +112,20 @@ class MultiIPCClient:
             pass_index=True,
         )
         return self._merge(shard_states)
+
+    def send_message(
+        self, data: bytes | np.ndarray, env_idx: int | np.ndarray | None = None
+    ) -> None:
+        """Queue a message for the selected envs; see IPCClient.send_message.
+        env_idx indexes all envs across shards."""
+        data = _as_message(data, self.message_size)
+        idx = _env_indices(env_idx, self.num_envs)
+        data = np.broadcast_to(data, (len(idx), self.message_size))
+        n = self._envs_per_shard
+        for i, shard in enumerate(self._shards):
+            sel = (idx // n) == i
+            if sel.any():
+                shard.send_message(data[sel], idx[sel] - i * n)
 
     def reset(self, mask: np.ndarray | None = None) -> EnvState:
         """Force a reset on every shard, wait for results, return a fresh combined state."""

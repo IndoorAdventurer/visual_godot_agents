@@ -37,6 +37,16 @@ size_t VGAAgentNode::get_info_size() {
     return static_cast<size_t>(ret);
 }
 
+size_t VGAAgentNode::get_message_size() {
+    int64_t ret = 0;
+    GDVIRTUAL_CALL(_get_message_size, ret);
+    return static_cast<size_t>(ret);
+}
+
+void VGAAgentNode::apply_message(PackedByteArray p_message) {
+    GDVIRTUAL_CALL(_apply_message, p_message);
+}
+
 void VGAAgentNode::apply_action(PackedByteArray p_action) {
     GDVIRTUAL_CALL(_apply_action, p_action);
 }
@@ -137,6 +147,8 @@ void VGAAgentNode::_bind_methods() {
     GDVIRTUAL_BIND(_get_action_size);
     GDVIRTUAL_BIND(_get_gpu_data_size);
     GDVIRTUAL_BIND(_get_info_size);
+    GDVIRTUAL_BIND(_get_message_size);
+    GDVIRTUAL_BIND(_apply_message, "p_message");
     GDVIRTUAL_BIND(_apply_action, "p_action");
     GDVIRTUAL_BIND(_collect_scalar_obs);
     GDVIRTUAL_BIND(_collect_info);

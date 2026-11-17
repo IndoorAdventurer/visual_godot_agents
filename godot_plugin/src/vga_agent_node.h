@@ -56,6 +56,8 @@ namespace godot {
             size_t get_action_size();
             size_t get_gpu_data_size();
             size_t get_info_size();
+            size_t get_message_size();
+            void apply_message(PackedByteArray p_message);
             void apply_action(PackedByteArray p_action);
             PackedByteArray collect_scalar_obs();
             PackedByteArray collect_info();
@@ -115,6 +117,8 @@ namespace godot {
             GDVIRTUAL0R(int64_t, _get_action_size);
             GDVIRTUAL0R(int64_t, _get_gpu_data_size);
             GDVIRTUAL0R(int64_t, _get_info_size);
+            GDVIRTUAL0R(int64_t, _get_message_size);
+            GDVIRTUAL1(_apply_message, PackedByteArray);
             GDVIRTUAL1(_apply_action, PackedByteArray);
             GDVIRTUAL0R(PackedByteArray, _collect_scalar_obs);
             GDVIRTUAL0R(PackedByteArray, _collect_info);

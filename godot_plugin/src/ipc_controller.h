@@ -31,6 +31,7 @@ namespace godot {
             uint32_t visual_height;
             uint32_t visual_channels;
             uint32_t info_size;        // bytes per env
+            uint32_t message_size;     // bytes per env
         };
 
         // Constituent helper objects:
@@ -46,6 +47,7 @@ namespace godot {
         size_t d_scalar_obs_size     = 0;
         size_t d_action_size         = 0;
         size_t d_info_size           = 0;
+        size_t d_message_size        = 0;
         std::vector<VGAAgentNode *> d_agents;
 
         // To check if env is at step 0:
@@ -53,13 +55,15 @@ namespace godot {
         bool d_first_exchange        = true;
 
         // Byte offsets into shared memory, fixed after initialize():
-        size_t d_visual_obs_offset   = 0;
-        size_t d_scalar_obs_offset   = 0;
-        size_t d_rewards_offset      = 0;
-        size_t d_terminated_offset   = 0;
-        size_t d_truncated_offset    = 0;
-        size_t d_info_offset         = 0;
-        size_t d_actions_offset      = 0;
+        size_t d_visual_obs_offset    = 0;
+        size_t d_scalar_obs_offset    = 0;
+        size_t d_rewards_offset       = 0;
+        size_t d_terminated_offset    = 0;
+        size_t d_truncated_offset     = 0;
+        size_t d_info_offset          = 0;
+        size_t d_message_flags_offset = 0;
+        size_t d_messages_offset      = 0;
+        size_t d_actions_offset       = 0;
 
         // Present each drawn frame to the main window (real-time mode only):
         bool d_present_frames = false;
@@ -78,9 +82,10 @@ namespace godot {
             IPCController &operator=(IPCController &&)      = delete;
 
             /**
-             * Initializes the layout. Queries scalar_obs_size, action_size and
-             * info_size from agents[0] — all agents must report identical sizes. Returns false if
-             * agents is empty or any size query returns zero.
+             * Initializes the layout. Queries scalar_obs_size, action_size,
+             * info_size and message_size from agents[0] — all agents must report
+             * identical sizes. Returns false if agents is empty, a size is invalid,
+             * or POSIX or GPU initialization fails.
              *
              * @param name              Name for POSIX IPC sems + shm
              * @param num_envs          Number of parallel environments.
@@ -130,6 +135,12 @@ namespace godot {
              * get_reward() and get_episode_state() are not called.
              */
             void _write_env_state() const;
+
+            /**
+             * Calls apply_message() on each agent whose message flag is set,
+             * clearing the flag.
+             */
+            void _dispatch_messages() const;
 
             /**
              * Reads action bytes for each env from shared memory and calls

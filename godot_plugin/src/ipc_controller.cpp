@@ -39,6 +39,7 @@ bool IPCController::initialize(
     size_t action_size     = agents[0]->get_action_size();
     size_t gpu_data_size   = agents[0]->get_gpu_data_size();
     size_t info_size       = agents[0]->get_info_size();
+    size_t message_size    = agents[0]->get_message_size();
 
     // 4 is the smallest alignment any std430 base type has, so a stride that
     // isn't a multiple of it cannot match any GLSL layout. Whether it matches
@@ -66,6 +67,7 @@ bool IPCController::initialize(
     d_scalar_obs_size = scalar_obs_size;
     d_action_size     = action_size;
     d_info_size       = info_size;
+    d_message_size    = message_size;
     d_agents          = agents;
     d_present_frames  = present_frames;
 
@@ -73,14 +75,16 @@ bool IPCController::initialize(
 
     d_gpu_data_size   = gpu_data_size;
 
-    d_visual_obs_offset  = sizeof(Header);
-    d_scalar_obs_offset  = d_visual_obs_offset + d_num_envs * d_visual_obs_size;
-    d_rewards_offset     = d_scalar_obs_offset + d_num_envs * d_scalar_obs_size;
-    d_terminated_offset  = d_rewards_offset    + d_num_envs * sizeof(float);
-    d_truncated_offset   = d_terminated_offset + d_num_envs * sizeof(uint8_t);
-    d_info_offset        = d_truncated_offset  + d_num_envs * sizeof(uint8_t);
-    d_actions_offset     = d_info_offset       + d_num_envs * d_info_size;
-    size_t total_size    = d_actions_offset    + d_num_envs * d_action_size;
+    d_visual_obs_offset    = sizeof(Header);
+    d_scalar_obs_offset    = d_visual_obs_offset    + d_num_envs * d_visual_obs_size;
+    d_rewards_offset       = d_scalar_obs_offset    + d_num_envs * d_scalar_obs_size;
+    d_terminated_offset    = d_rewards_offset       + d_num_envs * sizeof(float);
+    d_truncated_offset     = d_terminated_offset    + d_num_envs * sizeof(uint8_t);
+    d_info_offset          = d_truncated_offset     + d_num_envs * sizeof(uint8_t);
+    d_message_flags_offset = d_info_offset          + d_num_envs * d_info_size;
+    d_messages_offset      = d_message_flags_offset + d_num_envs * sizeof(uint8_t);
+    d_actions_offset       = d_messages_offset      + d_num_envs * d_message_size;
+    size_t total_size      = d_actions_offset       + d_num_envs * d_action_size;
 
     ERR_FAIL_COND_V_MSG(!d_posix.initialize(name, total_size), false,
                         "IPCController: IPCPosix initialization failed. Quitting.");
@@ -133,6 +137,10 @@ bool IPCController::exchange(double p_delta) {
     d_posix.step();
     VGA_PROFILE_POP();
 
+    VGA_PROFILE_PUSH("dispatch_messages");
+    _dispatch_messages();
+    VGA_PROFILE_POP();
+
     VGA_PROFILE_PUSH("dispatch_actions");
     _dispatch_actions();
     VGA_PROFILE_POP();
@@ -163,6 +171,7 @@ void IPCController::_write_env_state() const {
     header->visual_height   = d_visual_height;
     header->visual_channels = d_visual_channels;
     header->info_size       = static_cast<uint32_t>(d_info_size);
+    header->message_size    = static_cast<uint32_t>(d_message_size);
 
     uint8_t *base             = static_cast<uint8_t *>(d_posix.get_shm_ptr());
     uint8_t *scalar_obs_base  = base + d_scalar_obs_offset;
@@ -207,6 +216,25 @@ void IPCController::_bind_agent_gpu_data() const {
     RID buffer = d_gpu.get_gpu_data_buffer();
     for (size_t i = 0; i != d_num_envs; ++i)
         d_agents[i]->set_gpu_binding(buffer, i * d_gpu_data_size, d_gpu_data_size);
+}
+
+void IPCController::_dispatch_messages() const {
+    if (d_message_size == 0)
+        return;
+
+    uint8_t *base                = static_cast<uint8_t *>(d_posix.get_shm_ptr());
+    uint8_t *message_flags_base  = base + d_message_flags_offset;
+    const uint8_t *messages_base = base + d_messages_offset;
+
+    for (size_t i = 0; i != d_num_envs; ++i) {
+        if (!message_flags_base[i])
+            continue;
+        message_flags_base[i] = 0;
+        PackedByteArray message;
+        message.resize(static_cast<int>(d_message_size));
+        std::memcpy(message.ptrw(), messages_base + i * d_message_size, d_message_size);
+        d_agents[i]->apply_message(message);
+    }
 }
 
 void IPCController::_dispatch_actions() const {

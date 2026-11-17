@@ -32,9 +32,35 @@ class _Header(ctypes.Structure):
         ("visual_height",    ctypes.c_uint32),
         ("visual_channels",  ctypes.c_uint32),
         ("info_size",        ctypes.c_uint32),
+        ("message_size",     ctypes.c_uint32),
     ]
 
 _HEADER_SIZE = ctypes.sizeof(_Header)
+
+
+def _env_indices(env_idx: int | np.ndarray | None, num_envs: int) -> np.ndarray:
+    """Resolve None (all), an int, an index array or a bool mask into unique env indices."""
+    all_idx = np.arange(num_envs)
+    idx = all_idx if env_idx is None else np.atleast_1d(all_idx[env_idx])
+    if len(np.unique(idx)) != len(idx):
+        raise ValueError(f"duplicate env indices in {env_idx}")
+    return idx
+
+
+def _as_message(data: bytes | np.ndarray, message_size: int) -> np.ndarray:
+    """Check data is uint8 or bytes with a last dimension of message_size."""
+    if message_size == 0:
+        raise RuntimeError(
+            "no message block: not connected yet, or Godot's _get_message_size() is 0"
+        )
+    if isinstance(data, (bytes, bytearray, memoryview)):
+        data = np.frombuffer(data, dtype=np.uint8)
+    data = np.asarray(data)
+    if data.dtype != np.uint8:
+        raise TypeError(f"message dtype {data.dtype} != expected uint8")
+    if data.ndim == 0 or data.shape[-1] != message_size:
+        raise ValueError(f"message shape {data.shape} must end in message_size {message_size}")
+    return data
 
 
 class IPCClient:
@@ -90,9 +116,12 @@ class IPCClient:
         self.scalar_obs_size: int = 0
         self.action_size:     int = 0
         self.info_size:       int = 0
+        self.message_size:    int = 0
 
         self._state:       EnvState | None    = None
         self._actions_buf: np.ndarray | None  = None
+        self._message_flags: np.ndarray | None = None
+        self._messages_buf:  np.ndarray | None = None
 
     def launch_godot(
         self,
@@ -169,6 +198,21 @@ class IPCClient:
         self._env_ready.acquire()
         return self._state
 
+    def send_message(
+        self, data: bytes | np.ndarray, env_idx: int | np.ndarray | None = None
+    ) -> None:
+        """Queue a message for the selected envs, delivered with the next step() or reset().
+
+        env_idx is None (all envs), an int, an index array or a bool mask.
+        data is uint8 or bytes: (message_size,) goes to every selected env,
+        (k, message_size) gives one row per selected env. A second message to the
+        same env before delivery replaces the first.
+        """
+        data = _as_message(data, self.message_size)
+        idx = _env_indices(env_idx, self.num_envs)
+        self._messages_buf[idx] = data
+        self._message_flags[idx] = 1
+
     def reset(self, mask: np.ndarray | None = None) -> EnvState:
         """Force a reset of the flagged envs (all of them when mask is None).
 
@@ -200,6 +244,8 @@ class IPCClient:
         self._closed = True
         self._state = None
         self._actions_buf = None
+        self._message_flags = None
+        self._messages_buf = None
         if self._mem is not None:
             self._mem.close()
             self._mem = None
@@ -230,14 +276,17 @@ class IPCClient:
         self.scalar_obs_size = header.scalar_obs_size
         self.action_size     = header.action_size
         self.info_size       = header.info_size
+        self.message_size    = header.message_size
 
-        visual_obs_off  = _HEADER_SIZE
-        scalar_obs_off  = visual_obs_off   + self.num_envs * self.visual_obs_size
-        rewards_off     = scalar_obs_off   + self.num_envs * self.scalar_obs_size
-        terminated_off  = rewards_off      + self.num_envs * 4  # float32
-        truncated_off   = terminated_off   + self.num_envs      # uint8
-        info_off        = truncated_off    + self.num_envs      # uint8
-        actions_off     = info_off         + self.num_envs * self.info_size
+        visual_obs_off    = _HEADER_SIZE
+        scalar_obs_off    = visual_obs_off    + self.num_envs * self.visual_obs_size
+        rewards_off       = scalar_obs_off    + self.num_envs * self.scalar_obs_size
+        terminated_off    = rewards_off       + self.num_envs * 4  # float32
+        truncated_off     = terminated_off    + self.num_envs      # uint8
+        info_off          = truncated_off     + self.num_envs      # uint8
+        message_flags_off = info_off          + self.num_envs * self.info_size
+        messages_off      = message_flags_off + self.num_envs      # uint8
+        actions_off       = messages_off      + self.num_envs * self.message_size
 
         view = lambda offset, dtype, shape: np.ndarray(shape=shape, dtype=dtype, buffer=self._mem, offset=offset)
 
@@ -249,7 +298,9 @@ class IPCClient:
             truncated=  view(truncated_off,    np.uint8,   (self.num_envs,)),
             info=       view(info_off,         np.uint8,   (self.num_envs, self.info_size)),
         )
-        self._actions_buf = view(actions_off, np.uint8, (self.num_envs, self.action_size))
+        self._message_flags = view(message_flags_off, np.uint8, (self.num_envs,))
+        self._messages_buf  = view(messages_off,      np.uint8, (self.num_envs, self.message_size))
+        self._actions_buf   = view(actions_off,       np.uint8, (self.num_envs, self.action_size))
 
     def _write_actions(self, actions: np.ndarray) -> None:
         expected_shape = (self.num_envs, self.action_size)

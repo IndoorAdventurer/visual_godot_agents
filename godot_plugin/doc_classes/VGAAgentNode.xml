@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
-		Override [method _get_action_size] to declare the size of your action space in bytes, [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones, and [method _get_info_size] to report data that is not an observation. Together with [method _get_gpu_data_size], these are queried once before your environment enters the tree, so they must return hardcoded constants and cannot depend on anything [method Node._ready] sets up.
+		Override [method _get_action_size] to declare the size of your action space in bytes, [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones, [method _get_info_size] to report data that is not an observation, and [method _get_message_size] to receive data from Python that is not an action. Together with [method _get_gpu_data_size], these are queried once before your environment enters the tree, so they must return hardcoded constants and cannot depend on anything [method Node._ready] sets up.
 		Override the per-step callbacks to implement your environment's logic.
 		Optionally, values your compute shaders produce can be returned without a per-environment [method RenderingDevice.buffer_get_data], whose cost grows with environment count. Override [method _get_gpu_data_size] to opt in, write via [method get_gpu_buffer_rid] and read with [method get_gpu_data].
 	</description>
@@ -99,6 +99,20 @@
 			<description>
 				Override this only if your compute shaders write data you want back on the CPU. Return the size in bytes of this environment's slice of the shared GPU data buffer; the default returns 0, which disables the feature. Must return a hardcoded constant.
 				This must equal the std430 array stride of the layout your compute shader declares. VGA never sees your GLSL, so it cannot check this for you — it only rejects sizes that are not a multiple of 4, which no std430 layout can have. Watch for padding: [code]struct { uint a; vec4 b; }[/code] has a stride of 32, not 20, because [code]vec4[/code] aligns to 16.
+			</description>
+		</method>
+		<method name="_get_message_size" qualifiers="virtual">
+			<return type="int" />
+			<description>
+				Return the size in bytes of the messages passed to [method _apply_message]. Must return a hardcoded constant. The default returns 0, which disables messages entirely.
+			</description>
+		</method>
+		<method name="_apply_message" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="message" type="PackedByteArray" />
+			<description>
+				Receive a message Python sent to this environment, [method _get_message_size] bytes long. Called once per message, right before [method _apply_action] in the same step; not called in steps without one.
+				A reset that follows this step, whether the episode ended or Python asked for it, runs after this call. The reset before the first observation runs before any message can arrive, so [method _reset] must also work without one.
 			</description>
 		</method>
 		<method name="_apply_action" qualifiers="virtual">
