@@ -115,8 +115,18 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ) -> tuple[Any, dict]:
-        # TODO: seed is ignored — forwarding it needs its own IPC channel and a
-        # GDScript-side API for consuming it.
+        """
+        Reset every env. The first call connects to Godot instead, whose envs
+        were already reset on startup.
+
+        seed seeds self.np_random; Godot's own randomness is unaffected and
+        options is unused.
+
+        TODO: no clean way yet for a subclass to get a seed or other message
+        to Godot before the first reset, since the first call connects rather
+        than resets. See the PLM card "Messages before the first reset".
+        """
+        super().reset(seed=seed)
         if self._connected:
             self._state = self._client.reset()
             return self._get_obs(), self._decode_info(self._state.info)
