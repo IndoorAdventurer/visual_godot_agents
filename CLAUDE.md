@@ -52,7 +52,7 @@ XML documentation in `godot_plugin/doc_classes/`. Internal C++ components need n
 
 **Example projects** (`example_projects/`)
 - `roomba_demo/` — Roomba cleaning demo; `godot_project/` is the Godot project, `scripts/` holds PPO training (`clean_rl_ppo_test.py`, `train.sh`), interactive testing, and episode recording. The symlink `godot_project/addons/visual_godot_agents` points to `godot_plugin/addons/visual_godot_agents`.
-- `ipc_test_env/` — Minimal environment for validating the IPC layer; `godot_project/` is gitignored (work in progress), `scripts/` holds `launch_smoke_test.py`, `inspect_autoreset.py`, and `inspect_startup.py`.
+- `ipc_test_env/` — Minimal environment for validating the IPC layer; `godot_project/` is the Godot project, `scripts/` holds `launch_smoke_test.py`, `inspect_autoreset.py`, `inspect_startup.py` and `inspect_info_messages.py`.
 
 **Startup order**: Python must start first — it creates the semaphores and blocks on `env_ready`.
 Godot then opens the semaphores, creates shared memory, and posts `env_ready`. Python opens the
