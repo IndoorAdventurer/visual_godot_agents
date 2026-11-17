@@ -4,7 +4,7 @@ Verify the global env index, the info block and the message block end-to-end.
 Launches two Godot processes with two envs each through MultiIPCClient, so env
 indices and messages cross a process boundary.
 
-The test environment (hpa_agent_node.gd) reports 28 info bytes per env:
+The test environment (vga_agent_node.gd) reports 28 info bytes per env:
   int32 x 6: [global index, local index, total envs, reset_count,
               message_count, message_count_at_reset]
   uint8 x 4: the last message received
