@@ -9,10 +9,22 @@
 		Your environment scene must contain exactly one [VGAAgentNode] subclass. The Python process must create the semaphores and open the shared memory region using the same [member ipc_name] before Godot starts.
 	</description>
 	<methods>
+		<method name="get_env_index_offset" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the global index of this process's first environment, set by the [code]env_index_offset[/code] command-line argument. The Python client passes it when it spreads a run over several Godot processes; it is 0 otherwise. See [method VGAAgentNode.get_global_env_index].
+			</description>
+		</method>
+		<method name="get_total_num_envs" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of environments over all Godot processes of the run, set by the [code]total_num_envs[/code] command-line argument. Equals [member num_envs] when the argument is not given.
+			</description>
+		</method>
 		<method name="get_user_args" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [VGAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], [code]obs_channels[/code], [code]step_rate_hz[/code], and [code]real_time_mode[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
+				Returns all command-line arguments passed after [code]--[/code] that were not consumed by [VGAMasterNode] (i.e. everything except [code]ipc_name[/code], [code]num_envs[/code], [code]obs_width[/code], [code]obs_height[/code], [code]obs_channels[/code], [code]step_rate_hz[/code], [code]real_time_mode[/code], [code]env_index_offset[/code], and [code]total_num_envs[/code]). Arguments must be in [code]key=value[/code] format; malformed entries are ignored. Values are always strings — cast as needed.
 				[codeblock]
 				var args = $VGAMasterNode.get_user_args()
 				var scenario = args.get("scenario", "id")

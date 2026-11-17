@@ -100,6 +100,8 @@ class IPCClient:
         obs_height: int | None = None,
         obs_channels: int | None = None,
         step_rate_hz: int | None = None,
+        env_index_offset: int | None = None,
+        total_num_envs: int | None = None,
         extra_args: dict[str, str] | None = None,
     ) -> None:
         """
@@ -112,6 +114,9 @@ class IPCClient:
         VGAMasterNode property overrides (num_envs, obs_width, obs_height,
         obs_channels, step_rate_hz) are only forwarded when not None — Godot
         falls back to whatever is set in the scene inspector otherwise.
+
+        env_index_offset and total_num_envs place this process's envs among
+        all processes of a run; Godot defaults them to 0 and num_envs.
 
         On headless systems (HPC/SLURM) the caller is responsible for providing
         a valid DISPLAY, e.g. by running the whole job under `xvfb-run -a`.
@@ -132,6 +137,10 @@ class IPCClient:
             passthrough["obs_channels"] = str(obs_channels)
         if step_rate_hz is not None:
             passthrough["step_rate_hz"] = str(step_rate_hz)
+        if env_index_offset is not None:
+            passthrough["env_index_offset"] = str(env_index_offset)
+        if total_num_envs is not None:
+            passthrough["total_num_envs"] = str(total_num_envs)
         if extra_args:
             passthrough.update(extra_args)
 

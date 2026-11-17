@@ -78,8 +78,12 @@ void VGAAgentNode::reset() {
     }
 }
 
-int64_t VGAAgentNode::get_env_index() const {
-    return d_env_index;
+int64_t VGAAgentNode::get_local_env_index() const {
+    return d_local_env_index;
+}
+
+int64_t VGAAgentNode::get_global_env_index() const {
+    return d_global_env_index;
 }
 
 RID VGAAgentNode::get_gpu_buffer_rid() const {
@@ -112,7 +116,8 @@ void VGAAgentNode::clear_gpu_data() {
 }
 
 void VGAAgentNode::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("get_env_index"), &VGAAgentNode::get_env_index);
+    ClassDB::bind_method(D_METHOD("get_local_env_index"), &VGAAgentNode::get_local_env_index);
+    ClassDB::bind_method(D_METHOD("get_global_env_index"), &VGAAgentNode::get_global_env_index);
     ClassDB::bind_method(D_METHOD("get_gpu_buffer_rid"), &VGAAgentNode::get_gpu_buffer_rid);
     ClassDB::bind_method(D_METHOD("get_gpu_data"), &VGAAgentNode::get_gpu_data);
     ClassDB::bind_method(D_METHOD("clear_gpu_data"), &VGAAgentNode::clear_gpu_data);

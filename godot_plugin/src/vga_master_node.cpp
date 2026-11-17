@@ -21,6 +21,8 @@ VGAMasterNode::VGAMasterNode()
     d_ipc_name("vga"),
     d_step_rate_hz(30),
     d_real_time_mode(false),
+    d_env_index_offset(0),
+    d_total_num_envs(0),
     d_initialized(false)
 {}
 
@@ -29,6 +31,15 @@ void VGAMasterNode::_ready() {
         return;
 
     _apply_cmdline_args();
+
+    if (d_env_index_offset < 0 || d_env_index_offset + d_num_envs > get_total_num_envs()) {
+        ERR_PRINT("VGAMasterNode: env_index_offset " + itos(d_env_index_offset) +
+                  " with num_envs " + itos(d_num_envs) + " exceeds total_num_envs " +
+                  itos(get_total_num_envs()) + ". Quitting.");
+        get_tree()->quit();
+        return;
+    }
+
     _configure_sim_loop();
 
     // Envs stay out of the tree until IPC init has bound the GPU data buffer,
@@ -157,6 +168,14 @@ Dictionary VGAMasterNode::get_user_args() const {
     return d_user_args;
 }
 
+int VGAMasterNode::get_env_index_offset() const {
+    return d_env_index_offset;
+}
+
+int VGAMasterNode::get_total_num_envs() const {
+    return d_total_num_envs > 0 ? d_total_num_envs : d_num_envs;
+}
+
 void VGAMasterNode::_bind_methods() {
     // Environment scene property:
     ClassDB::bind_method(
@@ -216,6 +235,12 @@ void VGAMasterNode::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("get_user_args"), &VGAMasterNode::get_user_args);
 
+    // Placement among all Godot processes of a run (cmdline only):
+    ClassDB::bind_method(
+        D_METHOD("get_env_index_offset"), &VGAMasterNode::get_env_index_offset);
+    ClassDB::bind_method(
+        D_METHOD("get_total_num_envs"), &VGAMasterNode::get_total_num_envs);
+
     // Step rate:
     ClassDB::bind_method(
         D_METHOD("set_step_rate_hz", "p_hz"), &VGAMasterNode::set_step_rate_hz);
@@ -245,14 +270,16 @@ void VGAMasterNode::_apply_cmdline_args() {
         String key = arg.substr(0, eq);
         String val = arg.substr(eq + 1);
 
-        if      (key == "ipc_name")       d_ipc_name      = val;
-        else if (key == "num_envs")       d_num_envs      = val.to_int();
-        else if (key == "obs_width")      d_obs_res.x     = val.to_int();
-        else if (key == "obs_height")     d_obs_res.y     = val.to_int();
-        else if (key == "obs_channels")   d_obs_channels  = val.to_int();
-        else if (key == "step_rate_hz")   d_step_rate_hz  = val.to_int();
-        else if (key == "real_time_mode") d_real_time_mode = val.to_int() != 0;
-        else                              d_user_args[key] = val;
+        if      (key == "ipc_name")         d_ipc_name         = val;
+        else if (key == "num_envs")         d_num_envs         = val.to_int();
+        else if (key == "obs_width")        d_obs_res.x        = val.to_int();
+        else if (key == "obs_height")       d_obs_res.y        = val.to_int();
+        else if (key == "obs_channels")     d_obs_channels     = val.to_int();
+        else if (key == "step_rate_hz")     d_step_rate_hz     = val.to_int();
+        else if (key == "real_time_mode")   d_real_time_mode   = val.to_int() != 0;
+        else if (key == "env_index_offset") d_env_index_offset = val.to_int();
+        else if (key == "total_num_envs")   d_total_num_envs   = val.to_int();
+        else                                d_user_args[key]   = val;
     }
 }
 
@@ -314,11 +341,10 @@ bool VGAMasterNode::_build_envs(std::vector<SubViewport *> *r_viewports,
             memdelete(subview);
             return false;
         }
-        // Giving each agent its own index so it can be used, for example
-        // to give each environment a unique random seed later on. This must
-        // happen before the scene enters the tree, so get_env_index() is
-        // already valid inside the environment's own _ready().
-        agent->set_env_index(static_cast<int64_t>(idx));
+        // Before the scene enters the tree, so both indices are already
+        // valid inside the environment's own _ready().
+        agent->set_env_indices(static_cast<int64_t>(idx),
+                               static_cast<int64_t>(d_env_index_offset + idx));
 
         subview->add_child(scene_inst);
 

@@ -57,7 +57,7 @@ func _physics_process(delta: float) -> void:
 	push_consts.encode_float(12, collection_radius)
 	push_consts.encode_float(16, delta)
 	push_consts.encode_u32(20, n_particles)
-	push_consts.encode_u32(24, agent.get_env_index())
+	push_consts.encode_u32(24, agent.get_local_env_index())
 	
 	var cl = _rd.compute_list_begin()
 	

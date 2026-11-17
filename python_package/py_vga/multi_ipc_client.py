@@ -71,7 +71,7 @@ class MultiIPCClient:
         self.action_size     = 0
 
         if godot_binary is not None:
-            for shard in self._shards:
+            for i, shard in enumerate(self._shards):
                 shard.launch_godot(
                     godot_binary,
                     project_path=project_path,
@@ -80,6 +80,8 @@ class MultiIPCClient:
                     obs_height=obs_height,
                     obs_channels=obs_channels,
                     step_rate_hz=step_rate_hz,
+                    env_index_offset=i * self._envs_per_shard,
+                    total_num_envs=num_envs,
                     extra_args=extra_args,
                 )
 

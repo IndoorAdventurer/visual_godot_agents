@@ -14,7 +14,7 @@
 			<return type="RID" />
 			<description>
 				Returns the shared GPU data buffer to bind in your own uniform set, or an invalid [RID] if [method _get_gpu_data_size] returns 0.
-				All environments share this one buffer, so your compute shader must index it by [method get_env_index]. Pass that index in your own push constant — writing to the wrong slice silently corrupts another environment's data.
+				All environments share this one buffer, so your compute shader must index it by [method get_local_env_index]. Pass that index in your own push constant — writing to the wrong slice silently corrupts another environment's data.
 				[codeblock]
 				var data := RDUniform.new()
 				data.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
@@ -25,7 +25,7 @@
 				# Then, per dispatch — the index must reach the shader somehow:
 				var push_constants := PackedByteArray()
 				push_constants.resize(16)
-				push_constants.encode_u32(0, agent.get_env_index())
+				push_constants.encode_u32(0, agent.get_local_env_index())
 				[/codeblock]
 				And in the compute shader:
 				[codeblock]
@@ -58,14 +58,22 @@
 				Invalidates [method get_gpu_data] for this environment for the rest of the step, since the value already read back no longer describes the buffer.
 			</description>
 		</method>
-		<method name="get_env_index">
+		<method name="get_global_env_index" qualifiers="const">
 			<return type="int" />
 			<description>
-				Returns the zero-based index of this environment instance, assigned by [VGAMasterNode] during startup. Use it to, for example, offset random seeds so parallel environments are not identical:
+				Returns the zero-based index of this environment among all environments of the run, over every Godot process. Unique within a run, so use it to derive per-environment values such as random seeds:
 				[codeblock]
 				var rng = RandomNumberGenerator.new()
-				rng.seed = base_seed + get_env_index()
+				rng.seed = hash([base_seed, get_global_env_index()])
 				[/codeblock]
+				Equals [method get_local_env_index] plus [method VGAMasterNode.get_env_index_offset]. Valid from the environment's own [method Node._ready] on.
+			</description>
+		</method>
+		<method name="get_local_env_index" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the zero-based index of this environment within its own Godot process. Use it for per-process resources, such as this environment's slice of [method get_gpu_buffer_rid].
+				[b]Warning:[/b] when a run is spread over several Godot processes, every process numbers its environments from 0, so this index repeats. Do not derive random seeds from it; use [method get_global_env_index].
 			</description>
 		</method>
 		<method name="_get_scalar_obs_size" qualifiers="virtual">

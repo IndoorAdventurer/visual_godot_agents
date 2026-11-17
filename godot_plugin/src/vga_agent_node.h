@@ -22,7 +22,9 @@ namespace godot {
     class VGAAgentNode : public Node {
         GDCLASS(VGAAgentNode, Node)
 
-        int64_t d_env_index = -1;   // Set by VGAMasterNode during scene setup
+        // Set by VGAMasterNode during scene setup:
+        int64_t d_local_env_index  = -1;
+        int64_t d_global_env_index = -1;
 
         // GPU data binding, set once by IPCController. d_gpu_buffer is shared by
         // all envs; this agent owns the slice at [d_gpu_offset, +d_gpu_size).
@@ -63,7 +65,7 @@ namespace godot {
 
             /**
              * The buffer to bind in your own uniform set. All envs share it, so
-             * index it by get_env_index(). Invalid if _get_gpu_data_size() is 0.
+             * index it by get_local_env_index(). Invalid if _get_gpu_data_size() is 0.
              */
             RID get_gpu_buffer_rid() const;
 
@@ -83,14 +85,20 @@ namespace godot {
             void clear_gpu_data();
 
             /**
-             * Lets environments derive per-env values, e.g. a unique seed:
-             *   rng.seed = base_seed + get_env_index()
+             * Index within this Godot process, for per-process resources such as
+             * the GPU data buffer slice. Repeats across processes: not for seeding.
              */
-            int64_t get_env_index() const;
+            int64_t get_local_env_index() const;
+
+            /**
+             * Index unique across all Godot processes of a run, e.g. for seeding:
+             *   rng.seed = hash([base_seed, get_global_env_index()])
+             */
+            int64_t get_global_env_index() const;
 
             // --- Internal: driven by VGAMasterNode and IPCController ---
 
-            void set_env_index(int64_t index);
+            void set_env_indices(int64_t local_index, int64_t global_index);
             void set_gpu_binding(RID buffer, size_t offset, size_t size);
 
             // Open/close the window in which get_gpu_data() is readable.
@@ -113,8 +121,9 @@ namespace godot {
             static void _bind_methods();
     };
 
-    inline void VGAAgentNode::set_env_index(int64_t index) {
-        d_env_index = index;
+    inline void VGAAgentNode::set_env_indices(int64_t local_index, int64_t global_index) {
+        d_local_env_index  = local_index;
+        d_global_env_index = global_index;
     }
 
     inline void VGAAgentNode::set_gpu_binding(RID buffer, size_t offset, size_t size) {

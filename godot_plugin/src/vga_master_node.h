@@ -30,6 +30,8 @@ namespace godot {
         int d_step_rate_hz;           // Fixed physics tick rate exposed to Python as 1/step_rate_hz delta
         bool d_real_time_mode;        // Pace the loop to the wall clock and present a window
         Dictionary d_user_args;       // Parsed cmdline args not consumed by VGAMasterNode; exposed to GDScript
+        int d_env_index_offset;       // Global index of this process's env 0 (cmdline only)
+        int d_total_num_envs;         // Envs over all processes; 0 means num_envs (cmdline only)
 
         IPCController d_ipc;          // Responsible for all IPC with Python
         bool d_initialized;           // Set only after _ready() succeeds fully
@@ -57,6 +59,8 @@ namespace godot {
             void set_real_time_mode(bool p_enabled);
             bool get_real_time_mode() const;
             Dictionary get_user_args() const;
+            int get_env_index_offset() const;
+            int get_total_num_envs() const;
 
         protected:
             static void _bind_methods();
