@@ -30,6 +30,7 @@ namespace godot {
             uint32_t visual_width;
             uint32_t visual_height;
             uint32_t visual_channels;
+            uint32_t info_size;        // bytes per env
         };
 
         // Constituent helper objects:
@@ -44,6 +45,7 @@ namespace godot {
         size_t d_visual_obs_size     = 0;  // width * height * channels
         size_t d_scalar_obs_size     = 0;
         size_t d_action_size         = 0;
+        size_t d_info_size           = 0;
         std::vector<VGAAgentNode *> d_agents;
 
         // To check if env is at step 0:
@@ -56,6 +58,7 @@ namespace godot {
         size_t d_rewards_offset      = 0;
         size_t d_terminated_offset   = 0;
         size_t d_truncated_offset    = 0;
+        size_t d_info_offset         = 0;
         size_t d_actions_offset      = 0;
 
         // Present each drawn frame to the main window (real-time mode only):
@@ -75,8 +78,8 @@ namespace godot {
             IPCController &operator=(IPCController &&)      = delete;
 
             /**
-             * Initializes the layout. Queries scalar_obs_size and action_size from
-             * agents[0] — all agents must report identical sizes. Returns false if
+             * Initializes the layout. Queries scalar_obs_size, action_size and
+             * info_size from agents[0] — all agents must report identical sizes. Returns false if
              * agents is empty or any size query returns zero.
              *
              * @param name              Name for POSIX IPC sems + shm
@@ -120,8 +123,8 @@ namespace godot {
             bool _render_and_fetch(double p_delta);
 
             /**
-             * Writes the header and all per-env outgoing data (scalar obs, reward,
-             * terminated/truncated flags) into shared memory. The visual obs section
+             * Writes the header and all per-env outgoing data (scalar obs, info,
+             * reward, terminated/truncated flags) into shared memory. The visual obs section
              * is left untouched — _render_and_fetch writes there directly.
              * Envs flagged in d_was_reset report reward 0 and RUNNING; their
              * get_reward() and get_episode_state() are not called.

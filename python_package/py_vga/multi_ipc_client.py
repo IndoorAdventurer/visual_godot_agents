@@ -24,7 +24,7 @@ class MultiIPCClient:
 
     Presents the same connect() / step() / reset() / close() interface as IPCClient.
     Layout attributes (num_envs, visual_width, visual_height, visual_channels,
-    scalar_obs_size, action_size) are populated after connect().
+    scalar_obs_size, action_size, info_size) are populated after connect().
     """
 
     def __init__(
@@ -69,6 +69,7 @@ class MultiIPCClient:
         self.visual_channels = 0
         self.scalar_obs_size = 0
         self.action_size     = 0
+        self.info_size       = 0
 
         if godot_binary is not None:
             for i, shard in enumerate(self._shards):
@@ -96,6 +97,7 @@ class MultiIPCClient:
         self.visual_channels = s0.visual_channels
         self.scalar_obs_size = s0.scalar_obs_size
         self.action_size     = s0.action_size
+        self.info_size       = s0.info_size
 
         return self._merge(shard_states)
 
@@ -161,6 +163,7 @@ class MultiIPCClient:
             rewards=    np.empty((self.num_envs,), dtype=np.float32),
             terminated= np.empty((self.num_envs,), dtype=np.uint8),
             truncated=  np.empty((self.num_envs,), dtype=np.uint8),
+            info=       np.empty((self.num_envs, self.info_size), dtype=np.uint8),
         )
         for i, s in enumerate(shard_states):
             lo, hi = i * n, (i + 1) * n
@@ -169,4 +172,5 @@ class MultiIPCClient:
             state.rewards[lo:hi]    = s.rewards
             state.terminated[lo:hi] = s.terminated
             state.truncated[lo:hi]  = s.truncated
+            state.info[lo:hi]       = s.info
         return state

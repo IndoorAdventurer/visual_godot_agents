@@ -31,6 +31,12 @@ size_t VGAAgentNode::get_gpu_data_size() {
     return static_cast<size_t>(ret);
 }
 
+size_t VGAAgentNode::get_info_size() {
+    int64_t ret = 0;
+    GDVIRTUAL_CALL(_get_info_size, ret);
+    return static_cast<size_t>(ret);
+}
+
 void VGAAgentNode::apply_action(PackedByteArray p_action) {
     GDVIRTUAL_CALL(_apply_action, p_action);
 }
@@ -38,6 +44,12 @@ void VGAAgentNode::apply_action(PackedByteArray p_action) {
 PackedByteArray VGAAgentNode::collect_scalar_obs() {
     PackedByteArray ret;
     GDVIRTUAL_CALL(_collect_scalar_obs, ret);
+    return ret;
+}
+
+PackedByteArray VGAAgentNode::collect_info() {
+    PackedByteArray ret;
+    GDVIRTUAL_CALL(_collect_info, ret);
     return ret;
 }
 
@@ -94,8 +106,8 @@ PackedByteArray VGAAgentNode::get_gpu_data() const {
     ERR_FAIL_COND_V_MSG(
         !d_gpu_valid, PackedByteArray(),
         "VGAAgentNode: GPU data is only readable during an exchange (from "
-        "_get_reward, _get_episode_state or _collect_scalar_obs), and not after "
-        "clear_gpu_data().");
+        "_get_reward, _get_episode_state, _collect_scalar_obs or _collect_info), "
+        "and not after clear_gpu_data().");
 
     PackedByteArray out;
     out.resize(static_cast<int>(d_gpu_size));
@@ -124,8 +136,10 @@ void VGAAgentNode::_bind_methods() {
     GDVIRTUAL_BIND(_get_scalar_obs_size);
     GDVIRTUAL_BIND(_get_action_size);
     GDVIRTUAL_BIND(_get_gpu_data_size);
+    GDVIRTUAL_BIND(_get_info_size);
     GDVIRTUAL_BIND(_apply_action, "p_action");
     GDVIRTUAL_BIND(_collect_scalar_obs);
+    GDVIRTUAL_BIND(_collect_info);
     GDVIRTUAL_BIND(_get_reward);
     GDVIRTUAL_BIND(_get_episode_state);
     GDVIRTUAL_BIND(_reset);

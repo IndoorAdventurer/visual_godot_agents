@@ -18,6 +18,7 @@ class EnvState:
     rewards:     np.ndarray   # (N,)                  float32
     terminated:  np.ndarray   # (N,)                  uint8  — natural episode end
     truncated:   np.ndarray   # (N,)                  uint8  — artificial episode end
+    info:        np.ndarray   # (N, info_size)        uint8
 
 
 class _Header(ctypes.Structure):
@@ -30,6 +31,7 @@ class _Header(ctypes.Structure):
         ("visual_width",     ctypes.c_uint32),
         ("visual_height",    ctypes.c_uint32),
         ("visual_channels",  ctypes.c_uint32),
+        ("info_size",        ctypes.c_uint32),
     ]
 
 _HEADER_SIZE = ctypes.sizeof(_Header)
@@ -87,6 +89,7 @@ class IPCClient:
         self.visual_channels: int = 0
         self.scalar_obs_size: int = 0
         self.action_size:     int = 0
+        self.info_size:       int = 0
 
         self._state:       EnvState | None    = None
         self._actions_buf: np.ndarray | None  = None
@@ -226,13 +229,15 @@ class IPCClient:
         self.visual_channels = header.visual_channels
         self.scalar_obs_size = header.scalar_obs_size
         self.action_size     = header.action_size
+        self.info_size       = header.info_size
 
         visual_obs_off  = _HEADER_SIZE
         scalar_obs_off  = visual_obs_off   + self.num_envs * self.visual_obs_size
         rewards_off     = scalar_obs_off   + self.num_envs * self.scalar_obs_size
         terminated_off  = rewards_off      + self.num_envs * 4  # float32
         truncated_off   = terminated_off   + self.num_envs      # uint8
-        actions_off     = truncated_off    + self.num_envs      # uint8
+        info_off        = truncated_off    + self.num_envs      # uint8
+        actions_off     = info_off         + self.num_envs * self.info_size
 
         view = lambda offset, dtype, shape: np.ndarray(shape=shape, dtype=dtype, buffer=self._mem, offset=offset)
 
@@ -242,6 +247,7 @@ class IPCClient:
             rewards=    view(rewards_off,      np.float32, (self.num_envs,)),
             terminated= view(terminated_off,  np.uint8,   (self.num_envs,)),
             truncated=  view(truncated_off,    np.uint8,   (self.num_envs,)),
+            info=       view(info_off,         np.uint8,   (self.num_envs, self.info_size)),
         )
         self._actions_buf = view(actions_off, np.uint8, (self.num_envs, self.action_size))
 

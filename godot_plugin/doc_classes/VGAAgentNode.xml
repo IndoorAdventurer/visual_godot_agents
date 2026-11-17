@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Place exactly one subclass of [VGAAgentNode] inside your environment scene. [VGAMasterNode] locates it automatically and calls its methods each physics step to collect observations, retrieve rewards, and apply actions received from Python.
-		Override [method _get_action_size] to declare the size of your action space in bytes, and [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones. Together with [method _get_gpu_data_size], these are queried once before your environment enters the tree, so they must return hardcoded constants and cannot depend on anything [method Node._ready] sets up.
+		Override [method _get_action_size] to declare the size of your action space in bytes, [method _get_scalar_obs_size] if you need scalar observations alongside the visual ones, and [method _get_info_size] to report data that is not an observation. Together with [method _get_gpu_data_size], these are queried once before your environment enters the tree, so they must return hardcoded constants and cannot depend on anything [method Node._ready] sets up.
 		Override the per-step callbacks to implement your environment's logic.
 		Optionally, values your compute shaders produce can be returned without a per-environment [method RenderingDevice.buffer_get_data], whose cost grows with environment count. Override [method _get_gpu_data_size] to opt in, write via [method get_gpu_buffer_rid] and read with [method get_gpu_data].
 	</description>
@@ -47,7 +47,7 @@
 			<return type="PackedByteArray" />
 			<description>
 				Returns this environment's slice of the shared GPU buffer, [method _get_gpu_data_size] bytes long.
-				Only readable from [method _get_reward], [method _get_episode_state] and [method _collect_scalar_obs]. Calling it anywhere else pushes an error and returns an empty array, because the data is only fetched from the GPU during the exchange with Python.
+				Only readable from [method _get_reward], [method _get_episode_state], [method _collect_scalar_obs] and [method _collect_info]. Calling it anywhere else pushes an error and returns an empty array, because the data is only fetched from the GPU during the exchange with Python.
 				The data is one step old: environments dispatch their compute work in their own [method Node._physics_process], which runs after [VGAMasterNode]'s.
 			</description>
 		</method>
@@ -82,6 +82,12 @@
 				Return the size in bytes of the scalar observation vector written by [method _collect_scalar_obs]. Must return a hardcoded constant. The default returns 0, which disables scalar observations entirely — [method _collect_scalar_obs] is then never called, and Python receives an empty scalar block. Override it only if your environment needs observations beyond the visual ones.
 			</description>
 		</method>
+		<method name="_get_info_size" qualifiers="virtual">
+			<return type="int" />
+			<description>
+				Return the size in bytes of the info written by [method _collect_info]. Must return a hardcoded constant. The default returns 0, which disables info entirely — [method _collect_info] is then never called.
+			</description>
+		</method>
 		<method name="_get_action_size" qualifiers="virtual">
 			<return type="int" />
 			<description>
@@ -106,6 +112,13 @@
 			<return type="PackedByteArray" />
 			<description>
 				Return the scalar observations for the current step as raw bytes. The length must equal [method _get_scalar_obs_size]. Only called when that returns non-zero.
+			</description>
+		</method>
+		<method name="_collect_info" qualifiers="virtual">
+			<return type="PackedByteArray" />
+			<description>
+				Return this step's info as raw bytes: data for Python that is not an observation, such as episode bookkeeping. The length must equal [method _get_info_size]. Only called when that returns non-zero.
+				Called every step for every environment, including on a reset step, after [method _reset]. It runs right after [method _collect_scalar_obs] and before [method _get_reward] and [method _get_episode_state].
 			</description>
 		</method>
 		<method name="_get_reward" qualifiers="virtual">

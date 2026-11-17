@@ -55,8 +55,10 @@ namespace godot {
             size_t get_scalar_obs_size();
             size_t get_action_size();
             size_t get_gpu_data_size();
+            size_t get_info_size();
             void apply_action(PackedByteArray p_action);
             PackedByteArray collect_scalar_obs();
+            PackedByteArray collect_info();
             float get_reward();
             EpisodeState get_episode_state();
             void reset();
@@ -71,7 +73,8 @@ namespace godot {
 
             /**
              * This env's slice of the last GPU readback. Only readable from
-             * _get_reward(), _get_episode_state() and _collect_scalar_obs();
+             * _get_reward(), _get_episode_state(), _collect_scalar_obs() and
+             * _collect_info();
              * errors and returns empty anywhere else.
              */
             PackedByteArray get_gpu_data() const;
@@ -111,8 +114,10 @@ namespace godot {
             GDVIRTUAL0R(int64_t, _get_scalar_obs_size);
             GDVIRTUAL0R(int64_t, _get_action_size);
             GDVIRTUAL0R(int64_t, _get_gpu_data_size);
+            GDVIRTUAL0R(int64_t, _get_info_size);
             GDVIRTUAL1(_apply_action, PackedByteArray);
             GDVIRTUAL0R(PackedByteArray, _collect_scalar_obs);
+            GDVIRTUAL0R(PackedByteArray, _collect_info);
             GDVIRTUAL0R(float, _get_reward);
             GDVIRTUAL0R(int64_t, _get_episode_state);
             GDVIRTUAL0(_reset);

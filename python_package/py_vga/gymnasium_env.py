@@ -119,12 +119,12 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         # GDScript-side API for consuming it.
         if self._connected:
             self._state = self._client.reset()
-            return self._get_obs(), {}
+            return self._get_obs(), self._decode_info(self._state.info)
 
         self._state = self._client.connect()
         self._connected = True
         self._validate_layout()
-        return self._get_obs(), {}
+        return self._get_obs(), self._decode_info(self._state.info)
 
     def step(
         self, actions: np.ndarray
@@ -136,11 +136,21 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
             self._state.rewards,
             self._state.terminated.astype(bool),
             self._state.truncated.astype(bool),
-            {},
+            self._decode_info(self._state.info),
         )
 
     def close(self) -> None:
         self._client.close()
+
+    def _decode_info(self, data: np.ndarray) -> dict:
+        """
+        Turn the raw info block into the info dict returned by step() and reset().
+
+        data is (num_envs, info_size) uint8, owned by the caller. The default
+        returns {"data": data}, or {} when Godot reports no info. Override to
+        interpret the bytes.
+        """
+        return {"data": data} if data.shape[1] else {}
 
     # ------------------------------------------------------------------
     # Internal helpers
