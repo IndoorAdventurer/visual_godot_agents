@@ -124,9 +124,11 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         Reset every env. Messages queued with send_message() beforehand reach
         Godot before the reset.
 
-        seed seeds self.np_random; Godot's own randomness is unaffected and
-        options is unused.
+        seed seeds self.np_random; Godot's own randomness is unaffected.
+        options must be None or empty: none are supported, reset_mask included.
         """
+        if options:
+            raise ValueError(f"unsupported reset options: {sorted(options)}")
         super().reset(seed=seed)
         self._state = self._client.reset()
         return self._get_obs(), self._decode_info(self._state.info)
