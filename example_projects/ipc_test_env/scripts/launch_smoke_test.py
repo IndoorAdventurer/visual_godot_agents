@@ -49,7 +49,8 @@ with IPCClient("vga") as client:
     )
 
     print("Waiting for Godot to connect...")
-    state = client.connect()
+    client.connect()
+    state = client.reset()
 
     print(f"Connected — {client.num_envs} envs | "
           f"obs: {client.visual_width}x{client.visual_height}x{client.visual_channels} | "

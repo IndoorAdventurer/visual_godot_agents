@@ -88,9 +88,10 @@ class MultiIPCClient:
                     extra_args=extra_args,
                 )
 
-    def connect(self) -> EnvState:
-        """Connect to all shards (in parallel if N>1) and return the first combined state."""
-        shard_states = self._run_parallel(lambda shard: shard.connect())
+    def connect(self) -> None:
+        """Connect to all shards (in parallel if N>1) and read the layout.
+        Call reset() before stepping."""
+        self._run_parallel(lambda shard: shard.connect())
 
         s0 = self._shards[0]
         self.visual_obs_size = s0.visual_obs_size
@@ -101,8 +102,6 @@ class MultiIPCClient:
         self.action_size     = s0.action_size
         self.info_size       = s0.info_size
         self.message_size    = s0.message_size
-
-        return self._merge(shard_states)
 
     def step(self, actions: np.ndarray) -> EnvState:
         """Fan out actions to all shards, wait for results, return a fresh combined state."""
@@ -155,7 +154,7 @@ class MultiIPCClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _run_parallel(self, fn, pass_index: bool = False) -> list[EnvState]:
+    def _run_parallel(self, fn, pass_index: bool = False) -> list:
         """Call fn(shard) — or fn(shard, i) when pass_index=True — for every shard.
         Uses a ThreadPoolExecutor for N>1; calls directly for N=1."""
         if len(self._shards) == 1:

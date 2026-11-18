@@ -112,7 +112,7 @@
 			<param index="0" name="message" type="PackedByteArray" />
 			<description>
 				Receive a message Python sent to this environment, [method _get_message_size] bytes long. Called once per message, right before [method _apply_action] in the same step; not called in steps without one.
-				A reset that follows this step, whether the episode ended or Python asked for it, runs after this call. The reset before the first observation runs before any message can arrive, so [method _reset] must also work without one.
+				A reset that follows this step, whether the episode ended or Python asked for it, runs after this call. This includes the first reset: messages Python sends after connecting but before its first reset arrive here first, without an [method _apply_action].
 			</description>
 		</method>
 		<method name="_apply_action" qualifiers="virtual">

@@ -32,8 +32,8 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
     Observation space is per-environment. Pass a Box for visual-only obs, or a
     Dict{"visual": Box, "scalar": Box} when include_scalar_obs=True.
 
-    If godot_binary is None, Godot is not launched — the caller is responsible
-    for starting it manually before calling reset() (only valid for num_instances=1).
+    The constructor blocks until Godot is ready. If godot_binary is None, Godot is
+    not launched and the caller starts it by hand (only valid for num_instances=1).
 
     Autoreset is NEXT_STEP: a done flag arrives with the terminal observation, and
     the first observation of the new episode follows on the next step() with reward
@@ -69,7 +69,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
                 by num_instances.
             observation_space: Per-environment space. Box for visual-only, or
                 Dict{"visual": Box, "scalar": Box} with include_scalar_obs=True.
-                Cross-checked against Godot's header on the first reset().
+                Cross-checked against Godot's header on construction.
             action_space: Per-environment Box, MultiDiscrete or Discrete.
             include_scalar_obs: Whether the env also reports a scalar block.
             num_instances: Godot processes to shard num_envs across. Requires
@@ -94,7 +94,6 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
 
         self._include_scalar_obs = include_scalar_obs
         self._action_dtype, self._action_flat_dim = _parse_action_space(action_space)
-        self._connected = False
 
         self._client = MultiIPCClient(
             name,
@@ -108,6 +107,12 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
             step_rate_hz=step_rate_hz,
             extra_args=extra_args,
         )
+        try:
+            self._client.connect()
+            self._validate_layout()
+        except BaseException:
+            self._client.close()
+            raise
 
     def reset(
         self,
@@ -116,24 +121,14 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
         options: dict[str, Any] | None = None,
     ) -> tuple[Any, dict]:
         """
-        Reset every env. The first call connects to Godot instead, whose envs
-        were already reset on startup.
+        Reset every env. Messages queued with send_message() beforehand reach
+        Godot before the reset.
 
         seed seeds self.np_random; Godot's own randomness is unaffected and
         options is unused.
-
-        TODO: no clean way yet for a subclass to get a seed or other message
-        to Godot before the first reset, since the first call connects rather
-        than resets. See the PLM card "Messages before the first reset".
         """
         super().reset(seed=seed)
-        if self._connected:
-            self._state = self._client.reset()
-            return self._get_obs(), self._decode_info(self._state.info)
-
-        self._state = self._client.connect()
-        self._connected = True
-        self._validate_layout()
+        self._state = self._client.reset()
         return self._get_obs(), self._decode_info(self._state.info)
 
     def step(
@@ -154,7 +149,7 @@ class GodotVectorEnv(gymnasium.vector.VectorEnv):
     ) -> None:
         """
         Queue a message for the selected envs, delivered with the next step() or
-        reset(). Requires a prior reset().
+        reset().
 
         env_idx is None (all envs), an int, an index array or a bool mask.
         data is uint8 or bytes: (message_size,) goes to every selected env,

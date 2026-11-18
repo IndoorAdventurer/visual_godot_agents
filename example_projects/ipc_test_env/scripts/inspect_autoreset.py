@@ -10,13 +10,13 @@ episode_state_echo: 0.0 = RUNNING, 254.0 = TRUNCATED, 255.0 = TERMINATED
 After reset, last_action_byte is zeroed and reset_count is incremented, so
 the next observation will show [10.0, N] where N is the number of resets so far.
 
-VGA resets every env once before the first observation, so both envs start at
-reset_count=1, and the reset-step contract — reward 0.0 with both flags clear, and
-neither _get_reward() nor _get_episode_state() called — applies to the first
-exchange exactly as it does to every auto-reset.
+No env is reset until Python's first reset(), which resets both, so both envs start
+at reset_count=1, and the reset-step contract — reward 0.0 with both flags clear, and
+neither _get_reward() nor _get_episode_state() called — applies to that first reset
+exactly as it does to every auto-reset.
 
 Test sequence (requires exactly 2 environments):
-  1. First exchange: both envs already reset — reset_count=1, reward 0.0, flags clear.
+  1. First reset: both envs reset once — reset_count=1, reward 0.0, flags clear.
   2. Warm-up: a few normal steps — env 0 gets action 3, env 1 gets action 5.
   3. Termination trigger: env 0 gets action 255, env 1 keeps action 5.
      → step result must have terminated[0]=1, all other flags 0.
@@ -71,7 +71,8 @@ name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 print(f"Waiting for Godot environment '{name}'...")
 
 with IPCClient(name) as client:
-    state = client.connect()
+    client.connect()
+    state = client.reset()
 
     N = client.num_envs
     print(f"Connected — {N} envs | scalar_obs_size={client.scalar_obs_size} bytes")
@@ -81,10 +82,10 @@ with IPCClient(name) as client:
         sys.exit(1)
 
     # -------------------------------------------------------------------------
-    # 1. First exchange — every env is reset before the first render, so the obs
-    #    handed back by connect() must already satisfy the reset-step contract.
+    # 1. First reset — every env is reset before the first render, so the obs
+    #    it hands back must satisfy the reset-step contract.
     # -------------------------------------------------------------------------
-    print("\n[1/7] Checking first-exchange obs...")
+    print("\n[1/7] Checking first-reset obs...")
     echo0, rc0, se0 = _decode_scalar(state.scalar_obs[0])
     echo1, rc1, se1 = _decode_scalar(state.scalar_obs[1])
     check("first obs env0 reset_count == 1 (_reset ran)", np.isclose(rc0, 1.0))

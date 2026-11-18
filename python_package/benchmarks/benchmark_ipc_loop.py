@@ -114,7 +114,8 @@ def print_summary(latencies_s: np.ndarray, stall_step: int | None,
 print(f"Waiting for Godot environment '{args.name}'...")
 
 with IPCClient(args.name) as client:
-    state = client.connect()
+    client.connect()
+    state = client.reset()
     n = client.num_envs
     print(f"Connected — {n} envs | "
           f"{client.visual_width}×{client.visual_height}×{client.visual_channels} visual obs | "

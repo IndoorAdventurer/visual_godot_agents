@@ -75,7 +75,8 @@ def _run_profile(
         )
 
         print(f"    Waiting for Godot ({num_envs} envs)...")
-        state = client.connect()
+        client.connect()
+        state = client.reset()
 
         n = client.num_envs
         actions = np.zeros((n, client.action_size), dtype=np.uint8)

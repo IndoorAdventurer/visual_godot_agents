@@ -95,11 +95,22 @@ bool IPCController::initialize(
                         "IPCController: IPCGpu initialization failed. Quitting.");
 
     _bind_agent_gpu_data();
+    _write_header();
 
     return true;
 }
 
 bool IPCController::exchange(double p_delta) {
+    // The first exchange only signals that shared memory is ready. Messages
+    // Python sends before its first reset() are dispatched here, so they reach
+    // the agents before the reset at the top of the next exchange.
+    if (d_first_exchange) {
+        d_first_exchange = false;
+        d_posix.step();
+        _dispatch_messages();
+        return true;
+    }
+
     // Reset environments that finished in the PREVIOUS exchange. We read the
     // terminated/truncated flags written to shm by the previous _write_env_state()
     // call — nothing touches those bytes between then and now, so they are a
@@ -111,12 +122,11 @@ bool IPCController::exchange(double p_delta) {
     // the render fires before world._physics_process runs and before physics integrates.
     const uint8_t *shm_base = static_cast<const uint8_t *>(d_posix.get_shm_ptr());
     for (size_t i = 0; i != d_num_envs; ++i) {
-        d_was_reset[i] = d_first_exchange || shm_base[d_terminated_offset + i]
-                                          || shm_base[d_truncated_offset + i];
+        d_was_reset[i] = shm_base[d_terminated_offset + i]
+                      || shm_base[d_truncated_offset + i];
         if (d_was_reset[i])
             d_agents[i]->reset();
     }
-    d_first_exchange = false;
 
     VGA_PROFILE_PUSH("render_and_fetch");
     ERR_FAIL_COND_V_MSG(!_render_and_fetch(p_delta), false,
@@ -160,8 +170,7 @@ bool IPCController::_render_and_fetch(double p_delta) {
     return d_gpu.fetch_frame(shm + d_visual_obs_offset);
 }
 
-void IPCController::_write_env_state() const {
-    // Header — written every call so Python always has a valid layout description.
+void IPCController::_write_header() const {
     Header *header          = static_cast<Header *>(d_posix.get_shm_ptr());
     header->num_envs        = static_cast<uint32_t>(d_num_envs);
     header->visual_obs_size = static_cast<uint32_t>(d_visual_obs_size);
@@ -172,7 +181,9 @@ void IPCController::_write_env_state() const {
     header->visual_channels = d_visual_channels;
     header->info_size       = static_cast<uint32_t>(d_info_size);
     header->message_size    = static_cast<uint32_t>(d_message_size);
+}
 
+void IPCController::_write_env_state() const {
     uint8_t *base             = static_cast<uint8_t *>(d_posix.get_shm_ptr());
     uint8_t *scalar_obs_base  = base + d_scalar_obs_offset;
     uint8_t *rewards_base     = base + d_rewards_offset;

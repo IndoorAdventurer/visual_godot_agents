@@ -80,7 +80,8 @@ def _run_single(
         )
 
         print(f"    Waiting for Godot ({num_envs} envs)...")
-        state = client.connect()
+        client.connect()
+        state = client.reset()
 
         n = client.num_envs
         # Zero actions leave the agent motionless, which keeps timings clean but

@@ -11,7 +11,8 @@ The test environment (vga_agent_node.gd) reports 28 info bytes per env:
 and takes 4-byte messages, counting each one it receives.
 
 Test sequence:
-  1. First exchange: global indices 0-3, local 0,1,0,1, total 4, one reset, no messages.
+  1. First reset: global indices 0-3, local 0,1,0,1, total 4, one reset. A message
+     sent to env 0 between connect() and the first reset() arrives before that reset.
   2. Messages to envs 1 and 2 (one per process) arrive once, with their own bytes.
   3. A step without messages delivers nothing.
   4. An all-zero message is delivered.
@@ -70,49 +71,52 @@ client = MultiIPCClient(
 )
 
 with client:
-    state = client.connect()
+    client.connect()
     actions = np.zeros((NUM_ENVS, client.action_size), dtype=np.uint8)
     print(f"Connected — {client.num_envs} envs | info: {client.info_size}B | "
           f"message: {client.message_size}B")
 
-    print("1. First exchange")
-    info = decode(state.info)
+    print("1. First reset, with a message to env 0 sent before it")
+    client.send_message(bytes([3, 3, 3, 3]), 0)
+    info = decode(client.reset().info)
     check("global indices are 0..3", info["global"].tolist() == [0, 1, 2, 3])
     check("local indices are 0,1,0,1", info["local"].tolist() == [0, 1, 0, 1])
     check("total envs is 4 everywhere", info["total"].tolist() == [4] * 4)
     check("one reset each", info["resets"].tolist() == [1] * 4)
-    check("no messages yet", info["messages"].tolist() == [0] * 4)
-    check("first reset ran without a message", info["messages_at_reset"].tolist() == [0] * 4)
+    check("only env 0 received a message", info["messages"].tolist() == [1, 0, 0, 0])
+    check("env 0 got its bytes", info["last"][0].tolist() == [3, 3, 3, 3])
+    check("message arrived before the first _reset()",
+          info["messages_at_reset"].tolist() == [1, 0, 0, 0])
 
     print("2. Messages to envs 1 and 2")
     client.send_message(np.array([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=np.uint8), [1, 2])
     info = decode(client.step(actions).info)
-    check("only envs 1 and 2 received one", info["messages"].tolist() == [0, 1, 1, 0])
+    check("only envs 1 and 2 received one", info["messages"].tolist() == [1, 1, 1, 0])
     check("env 1 got its bytes", info["last"][1].tolist() == [1, 2, 3, 4])
     check("env 2 got its bytes", info["last"][2].tolist() == [5, 6, 7, 8])
 
     print("3. Step without messages")
     info = decode(client.step(actions).info)
-    check("nothing delivered", info["messages"].tolist() == [0, 1, 1, 0])
+    check("nothing delivered", info["messages"].tolist() == [1, 1, 1, 0])
 
     print("4. All-zero message to env 3")
     client.send_message(np.zeros(4, dtype=np.uint8), 3)
     info = decode(client.step(actions).info)
-    check("env 3 received it", info["messages"].tolist() == [0, 1, 1, 1])
+    check("env 3 received it", info["messages"].tolist() == [1, 1, 1, 1])
     check("env 3 got zeros", info["last"][3].tolist() == [0, 0, 0, 0])
 
     print("5. Message to all envs")
     client.send_message(bytes([9, 9, 9, 9]))
     info = decode(client.step(actions).info)
-    check("every env received one", info["messages"].tolist() == [1, 2, 2, 2])
+    check("every env received one", info["messages"].tolist() == [2, 2, 2, 2])
     check("every env got the bytes", (info["last"] == 9).all())
 
     print("6. Message with a forced reset of env 0")
     client.send_message(bytes([7, 7, 7, 7]), 0)
     info = decode(client.reset(np.array([1, 0, 0, 0], dtype=np.uint8)).info)
     check("only env 0 was reset", info["resets"].tolist() == [2, 1, 1, 1])
-    check("env 0 received the message", info["messages"][0] == 2)
-    check("message arrived before _reset()", info["messages_at_reset"][0] == 2)
+    check("env 0 received the message", info["messages"][0] == 3)
+    check("message arrived before _reset()", info["messages_at_reset"][0] == 3)
 
     print("7. Two messages to env 1 before one step")
     client.send_message(bytes([1, 1, 1, 1]), 1)

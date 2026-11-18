@@ -1,6 +1,6 @@
 """
 Capture the first N_FRAMES frames from a running Godot VGA environment and plot
-them in a grid: rows = frames (0 = frame returned by connect()), columns = envs.
+them in a grid: rows = frames (0 = frame returned by the first reset()), columns = envs.
 
 Each environment receives a distinct cycling action sequence (env e gets action
 (step + e) % N_COLORS) so all envs show different colours at the same frame —
@@ -22,7 +22,7 @@ matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
 from py_vga.ipc_client import IPCClient
 
-# How many frames to capture (frame 0 = returned by connect()).
+# How many frames to capture (frame 0 = returned by the first reset()).
 N_FRAMES = 15
 # How many frames to step through without capturing before the main capture.
 SKIP_FRAMES = 0
@@ -46,7 +46,8 @@ name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 print(f"Waiting for Godot environment '{name}'...")
 
 with IPCClient(name) as client:
-    state = client.connect()
+    client.connect()
+    state = client.reset()
 
     W = client.visual_width
     H = client.visual_height
@@ -64,10 +65,10 @@ with IPCClient(name) as client:
 
     frames: list[list[np.ndarray]] = []          # frames[frame_idx][env_idx]
     scalar_snapshots: list[np.ndarray] = []      # (N, scalar_obs_size) uint8 per frame
-    # Action sent before each frame; None for frame 0 (connect, no action sent yet).
+    # Action sent before each frame; None for frame 0 (reset, no action sent yet).
     action_log: list[np.ndarray | None] = []
 
-    # Frame 0: state returned by connect() — last_action_byte is 0 in all envs.
+    # Frame 0: state returned by reset() — last_action_byte is 0 in all envs.
     frames.append([extract_display(state.visual_obs[e].copy(), C) for e in range(N)])
     scalar_snapshots.append(state.scalar_obs.copy())
     action_log.append(None)
@@ -103,7 +104,7 @@ fig, axes = plt.subplots(
 )
 fig.suptitle(
     f"First {N_FRAMES} frames — {N} envs ({W}×{H}, {C}ch)\n"
-    "Row 0 = connect() (no action). Subsequent rows: env e → action (step+e) % 8.",
+    "Row 0 = first reset() (no action). Subsequent rows: env e → action (step+e) % 8.",
     fontsize=10,
 )
 

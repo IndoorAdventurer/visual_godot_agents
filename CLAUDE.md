@@ -56,4 +56,6 @@ XML documentation in `godot_plugin/doc_classes/`. Internal C++ components need n
 
 **Startup order**: Python must start first — it creates the semaphores and blocks on `env_ready`.
 Godot then opens the semaphores, creates shared memory, and posts `env_ready`. Python opens the
-shared memory after that post. No further handshake is needed.
+shared memory after that post. No further handshake is needed. That first exchange only
+signals ready: no env is reset or rendered until Python's first `reset()`, and messages
+sent before it reach Godot first.

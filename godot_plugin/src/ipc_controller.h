@@ -52,6 +52,8 @@ namespace godot {
 
         // To check if env is at step 0:
         std::vector<uint8_t> d_was_reset;
+
+        // The first exchange only hands over control; see exchange():
         bool d_first_exchange        = true;
 
         // Byte offsets into shared memory, fixed after initialize():
@@ -113,6 +115,10 @@ namespace godot {
              * actions and processes them. Returns false on GPU readback failure;
              * caller should treat this as fatal.
              *
+             * The first call only signals Python and dispatches the messages it
+             * sends back: no reset, render or actions. Envs stay unreset until
+             * Python flags them.
+             *
              * @param p_delta  Physics delta, forwarded to force_draw() so shader
              *                 TIME advances at the correct simulation rate.
              */
@@ -128,7 +134,12 @@ namespace godot {
             bool _render_and_fetch(double p_delta);
 
             /**
-             * Writes the header and all per-env outgoing data (scalar obs, info,
+             * Writes the layout Header to the start of shared memory.
+             */
+            void _write_header() const;
+
+            /**
+             * Writes all per-env outgoing data (scalar obs, info,
              * reward, terminated/truncated flags) into shared memory. The visual obs section
              * is left untouched — _render_and_fetch writes there directly.
              * Envs flagged in d_was_reset report reward 0 and RUNNING; their

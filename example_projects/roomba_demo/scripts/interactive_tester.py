@@ -72,7 +72,8 @@ name = sys.argv[1] if len(sys.argv) > 1 else "vga"
 print(f"Waiting for Godot environment '{name}'...")
 
 with IPCClient(name) as client:
-    state = client.connect()
+    client.connect()
+    state = client.reset()
 
     N = client.num_envs
     W = client.visual_width

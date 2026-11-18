@@ -69,10 +69,10 @@ class IPCClient:
 
     Python creates and owns the semaphores; Godot creates and owns the shared
     memory. On connect(), Python blocks on env_ready until Godot has written
-    the first state, then opens the shared memory that is guaranteed to exist
-    by that point.
+    the layout header, then opens the shared memory that is guaranteed to exist
+    by that point. No env is reset until the first reset().
 
-    The EnvState returned by connect(), step() and reset() holds numpy views directly
+    The EnvState returned by step() and reset() holds numpy views directly
     into the shared memory buffer — no per-step copies. The same EnvState
     instance is returned every call; its arrays are updated in-place by Godot
     between steps.
@@ -80,7 +80,8 @@ class IPCClient:
     Usage:
     ```
     with IPCClient("my_env") as client:
-        state = client.connect()
+        client.connect()
+        state = client.reset()
         while True:
             actions = np.zeros((client.num_envs, client.action_size), dtype=np.uint8)
             state = client.step(actions)
@@ -122,6 +123,7 @@ class IPCClient:
         self._actions_buf: np.ndarray | None  = None
         self._message_flags: np.ndarray | None = None
         self._messages_buf:  np.ndarray | None = None
+        self._never_reset:   np.ndarray | None = None
 
     def launch_godot(
         self,
@@ -179,20 +181,29 @@ class IPCClient:
         cmd += ["--"] + [f"{k}={v}" for k, v in passthrough.items()]
         self._process = subprocess.Popen(cmd)
 
-    def connect(self) -> EnvState:
+    def connect(self) -> None:
         """
-        Block until Godot signals env_ready, open shared memory, and return
-        the first environment state. Call this once before stepping.
+        Block until Godot signals env_ready, open shared memory and read the
+        layout. Call once, then reset() before stepping. Messages sent in
+        between reach Godot before that first reset.
         """
         self._env_ready.acquire()
         shm = posix_ipc.SharedMemory(f"/{self._name}")
         self._mem = mmap.mmap(shm.fd, shm.size)
         shm.close_fd()
         self._init_layout()
-        return self._state
+        self._never_reset = np.ones(self.num_envs, dtype=bool)
 
     def step(self, actions: np.ndarray) -> EnvState:
-        """Write actions, signal Godot, wait for the next state, return it."""
+        """Write actions, signal Godot, wait for the next state, return it.
+        Every env must have been reset at least once."""
+        if self._never_reset is None:
+            raise RuntimeError("step() called before connect()")
+        if self._never_reset.any():
+            raise RuntimeError(
+                f"step() called before envs {np.flatnonzero(self._never_reset).tolist()} "
+                "were ever reset"
+            )
         self._write_actions(actions)
         self._act_ready.release()
         self._env_ready.acquire()
@@ -232,6 +243,7 @@ class IPCClient:
             self._state.terminated[:] = 1
         else:
             self._state.terminated[:] = np.asarray(mask, dtype=np.uint8)
+        self._never_reset &= ~self._state.terminated.astype(bool)
 
         self._actions_buf[:] = 0
         self._act_ready.release()
@@ -246,6 +258,7 @@ class IPCClient:
         self._actions_buf = None
         self._message_flags = None
         self._messages_buf = None
+        self._never_reset = None
         if self._mem is not None:
             self._mem.close()
             self._mem = None
