@@ -4,6 +4,7 @@ import subprocess
 import posix_ipc
 import numpy as np
 from dataclasses import dataclass
+from typing import Self
 
 
 @dataclass
@@ -272,10 +273,10 @@ class IPCClient:
                 self._process.kill()
             self._process = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, *_: object) -> None:
         self.close()
 
     def _init_layout(self) -> None:

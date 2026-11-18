@@ -12,6 +12,7 @@ extra copy.
 """
 
 import atexit
+from typing import Self
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
@@ -144,10 +145,10 @@ class MultiIPCClient:
         for shard in self._shards:
             shard.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, *_: object) -> None:
         self.close()
 
     # ------------------------------------------------------------------
