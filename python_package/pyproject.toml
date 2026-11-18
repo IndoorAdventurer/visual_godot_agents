@@ -20,9 +20,12 @@ dev = [
     "pandas",
     "opencv-python",
 ]
-train = [
+torch = [
     "py-vga[gymnasium]",
     "torch",
+]
+train = [
+    "py-vga[torch]",
     "tyro",
     "tensorboard",
 ]

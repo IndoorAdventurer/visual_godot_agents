@@ -1107,6 +1107,10 @@ dev = [
 gymnasium = [
     { name = "gymnasium" },
 ]
+torch = [
+    { name = "gymnasium" },
+    { name = "torch" },
+]
 train = [
     { name = "gymnasium" },
     { name = "tensorboard" },
@@ -1123,13 +1127,14 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'dev'" },
     { name = "posix-ipc" },
     { name = "py-vga", extras = ["gymnasium"], marker = "extra == 'dev'" },
-    { name = "py-vga", extras = ["gymnasium"], marker = "extra == 'train'" },
+    { name = "py-vga", extras = ["gymnasium"], marker = "extra == 'torch'" },
+    { name = "py-vga", extras = ["torch"], marker = "extra == 'train'" },
     { name = "pyqt5", marker = "extra == 'dev'" },
     { name = "tensorboard", marker = "extra == 'train'" },
-    { name = "torch", marker = "extra == 'train'" },
+    { name = "torch", marker = "extra == 'torch'" },
     { name = "tyro", marker = "extra == 'train'" },
 ]
-provides-extras = ["gymnasium", "dev", "train"]
+provides-extras = ["gymnasium", "dev", "torch", "train"]
 
 [[package]]
 name = "pyparsing"
