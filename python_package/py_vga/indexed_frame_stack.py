@@ -34,6 +34,7 @@ import torch
 from gymnasium.vector import VectorWrapper
 from gymnasium.vector.utils import batch_space
 
+from .episode_starts import EpisodeStarts
 from .frame_stack_common import SINGLE_KEY, leaf_spaces, validate_stacking
 
 
@@ -104,7 +105,7 @@ class IndexedFrameStack(VectorWrapper):
         # Episode start per stored row, so any resident handle can be resolved.
         self._ep_start = torch.zeros((capacity, n), dtype=torch.int64, device=self.device)
         self._cur_ep_start = torch.zeros(n, dtype=torch.int64, device=self.device)
-        self._pending_new_ep = np.ones(n, dtype=bool)
+        self._starts = EpisodeStarts(n)
         self._newest_t = -1
         self._floor_t = 0
 
@@ -124,16 +125,11 @@ class IndexedFrameStack(VectorWrapper):
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         obs, info = self.env.reset(seed=seed, options=options)
-        self._pending_new_ep = np.ones(self.num_envs, dtype=bool)
-        handles = self._record(obs)
-        self._pending_new_ep = np.zeros(self.num_envs, dtype=bool)
-        return handles, info
+        return self._record(obs, self._starts.reset()), info
 
     def step(self, actions):
         obs, rewards, terminations, truncations, infos = self.env.step(actions)
-        handles = self._record(obs)
-        # Done marks this observation as terminal; the next one starts an episode.
-        self._pending_new_ep = np.logical_or(terminations, truncations)
+        handles = self._record(obs, self._starts.step(terminations, truncations))
         return handles, rewards, terminations, truncations, infos
 
     # ------------------------------------------------------------------
@@ -218,12 +214,13 @@ class IndexedFrameStack(VectorWrapper):
     def _oldest_t(self) -> int:
         return max(self._floor_t, self._newest_t - self.capacity + 1, 0)
 
-    def _record(self, obs) -> np.ndarray:
-        """Store one batched observation and return its handles."""
+    def _record(self, obs, starts: np.ndarray) -> np.ndarray:
+        """Store one batched observation and return its handles.
+        starts marks the envs whose episode begins at this observation."""
         t = self._newest_t + 1
         slot = t % self.capacity
 
-        starts = torch.as_tensor(self._pending_new_ep, device=self.device).bool()
+        starts = torch.as_tensor(starts, device=self.device)
         self._cur_ep_start = torch.where(
             starts, torch.full_like(self._cur_ep_start, t), self._cur_ep_start
         )

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import gymnasium as gym
 import numpy as np
+from py_vga import EpisodeStarts
 from py_vga.gymnasium_env import GodotVectorEnv
 import torch
 import torch.nn as nn
@@ -227,12 +228,12 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
     episode_returns = np.zeros(args.num_envs)
+    starts = EpisodeStarts(args.num_envs)
     next_obs, _ = envs.reset(seed=args.seed)
     # from_numpy keeps the observation uint8; torch.Tensor is an alias for FloatTensor and
     # would widen it to float32 before the transfer, quadrupling every upload.
     next_obs = torch.from_numpy(next_obs).to(device)
-    next_start = torch.ones(args.num_envs).to(device)  # the reset observation begins an episode
-    pending_done = torch.zeros(args.num_envs).to(device)  # done delivered with next_obs
+    next_start = torch.from_numpy(starts.reset()).float().to(device)
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -258,10 +259,7 @@ if __name__ == "__main__":
             done_np = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs = torch.from_numpy(next_obs).to(device)
-            # The observation just received is terminal when its done is set, so the new
-            # episode begins on the one after it: carry the previous flag forward.
-            next_start = pending_done
-            pending_done = torch.Tensor(done_np).to(device)
+            next_start = torch.from_numpy(starts.step(terminations, truncations)).float().to(device)
 
             episode_returns += reward
             for i, done in enumerate(done_np):

@@ -26,6 +26,7 @@ import numpy as np
 from gymnasium.vector import VectorWrapper
 from gymnasium.vector.utils import batch_space
 
+from .episode_starts import EpisodeStarts
 from .frame_stack_common import SINGLE_KEY, leaf_spaces, validate_stacking
 
 
@@ -65,7 +66,7 @@ class NaiveFrameStack(VectorWrapper):
         self._offsets = np.arange(stack - 1, -1, -1) * stride
         self._env_ids = np.arange(n)
         self._ep_start = np.zeros(n, dtype=np.int64)
-        self._pending_new_ep = np.ones(n, dtype=bool)
+        self._starts = EpisodeStarts(n)
         self._t = -1
 
         self.single_observation_space = batch_space(self.frame_observation_space, stack)
@@ -73,23 +74,19 @@ class NaiveFrameStack(VectorWrapper):
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         obs, info = self.env.reset(seed=seed, options=options)
-        self._pending_new_ep = np.ones(self.num_envs, dtype=bool)
-        stacked = self._record(obs)
-        self._pending_new_ep = np.zeros(self.num_envs, dtype=bool)
-        return stacked, info
+        return self._record(obs, self._starts.reset()), info
 
     def step(self, actions):
         obs, rewards, terminations, truncations, infos = self.env.step(actions)
-        stacked = self._record(obs)
-        # Done marks this observation as terminal; the next one starts an episode.
-        self._pending_new_ep = np.logical_or(terminations, truncations)
+        stacked = self._record(obs, self._starts.step(terminations, truncations))
         return stacked, rewards, terminations, truncations, infos
 
-    def _record(self, obs):
-        """Store one batched observation and return the stack ending at it."""
+    def _record(self, obs, starts: np.ndarray):
+        """Store one batched observation and return the stack ending at it.
+        starts marks the envs whose episode begins at this observation."""
         self._t += 1
         t = self._t
-        self._ep_start = np.where(self._pending_new_ep, t, self._ep_start)
+        self._ep_start = np.where(starts, t, self._ep_start)
 
         slot = t % self._window
         for key, buf in self._buffers.items():
