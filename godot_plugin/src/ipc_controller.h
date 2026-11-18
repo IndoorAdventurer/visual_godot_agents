@@ -53,9 +53,6 @@ namespace godot {
         // To check if env is at step 0:
         std::vector<uint8_t> d_was_reset;
 
-        // The first exchange only hands over control; see exchange():
-        bool d_first_exchange        = true;
-
         // Byte offsets into shared memory, fixed after initialize():
         size_t d_visual_obs_offset    = 0;
         size_t d_scalar_obs_offset    = 0;
@@ -110,14 +107,18 @@ namespace godot {
             );
 
             /**
-             * Resets any done environments, renders the current frame, gathers
-             * data to send to Python, then blocks until Python signals back with
-             * actions and processes them. Returns false on GPU readback failure;
-             * caller should treat this as fatal.
-             *
-             * The first call only signals Python and dispatches the messages it
-             * sends back: no reset, render or actions. Envs stay unreset until
-             * Python flags them.
+             * Signals Python that shared memory is ready, blocks until it hands
+             * control back, then dispatches the messages it sent. No reset,
+             * render or actions. Call once, after initialize() and before the
+             * first exchange().
+             */
+            void handshake();
+
+            /**
+             * Resets the environments flagged done in shared memory, renders the
+             * current frame, gathers data to send to Python, then blocks until
+             * Python signals back with actions and processes them. Returns false
+             * on GPU readback failure; caller should treat this as fatal.
              *
              * @param p_delta  Physics delta, forwarded to force_draw() so shader
              *                 TIME advances at the correct simulation rate.

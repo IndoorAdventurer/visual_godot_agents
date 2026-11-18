@@ -70,6 +70,9 @@ void VGAMasterNode::_ready() {
     // would read an uninitialised framebuffer.
     RenderingServer::get_singleton()->force_draw(false);
 
+    // Blocks until Python has connected and requested its first reset.
+    d_ipc.handshake();
+
     d_initialized = true;
 }
 

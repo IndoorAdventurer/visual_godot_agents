@@ -4,15 +4,17 @@ Verify the global env index, the info block and the message block end-to-end.
 Launches two Godot processes with two envs each through MultiIPCClient, so env
 indices and messages cross a process boundary.
 
-The test environment (vga_agent_node.gd) reports 28 info bytes per env:
+The test environment (vga_agent_node.gd) reports 32 info bytes per env:
   int32 x 6: [global index, local index, total envs, reset_count,
               message_count, message_count_at_reset]
   uint8 x 4: the last message received
+  int32 x 1: _physics_process calls so far
 and takes 4-byte messages, counting each one it receives.
 
 Test sequence:
   1. First reset: global indices 0-3, local 0,1,0,1, total 4, one reset. A message
-     sent to env 0 between connect() and the first reset() arrives before that reset.
+     sent to env 0 between connect() and the first reset() arrives before that reset,
+     No env ran a physics tick before it, and each runs one per step after it.
   2. Messages to envs 1 and 2 (one per process) arrive once, with their own bytes.
   3. A step without messages delivers nothing.
   4. An all-zero message is delivered.
@@ -48,11 +50,12 @@ def check(label: str, condition: bool) -> None:
 
 
 def decode(info: np.ndarray) -> dict[str, np.ndarray]:
-    """Split the (N, 28) info block into named per-env arrays."""
+    """Split the (N, 32) info block into named per-env arrays."""
     ints = np.ascontiguousarray(info[:, :24]).view(np.int32)
     names = ["global", "local", "total", "resets", "messages", "messages_at_reset"]
     out = {name: ints[:, i] for i, name in enumerate(names)}
     out["last"] = info[:, 24:28]
+    out["physics_ticks"] = np.ascontiguousarray(info[:, 28:32]).view(np.int32)[:, 0]
     return out
 
 
@@ -87,10 +90,14 @@ with client:
     check("env 0 got its bytes", info["last"][0].tolist() == [3, 3, 3, 3])
     check("message arrived before the first _reset()",
           info["messages_at_reset"].tolist() == [1, 0, 0, 0])
+    ticks = info["physics_ticks"].tolist()
+    check(f"no physics tick before the first obs (got {ticks})", ticks == [0] * 4)
 
     print("2. Messages to envs 1 and 2")
     client.send_message(np.array([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=np.uint8), [1, 2])
     info = decode(client.step(actions).info)
+    ticks = info["physics_ticks"].tolist()
+    check(f"one physics tick after the first step (got {ticks})", ticks == [1] * 4)
     check("only envs 1 and 2 received one", info["messages"].tolist() == [1, 1, 1, 0])
     check("env 1 got its bytes", info["last"][1].tolist() == [1, 2, 3, 4])
     check("env 2 got its bytes", info["last"][2].tolist() == [5, 6, 7, 8])

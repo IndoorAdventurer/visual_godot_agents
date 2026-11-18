@@ -12,6 +12,9 @@ var message_count: int = 0
 var last_message := PackedByteArray([0, 0, 0, 0])
 var message_count_at_reset: int = -1
 
+# _physics_process calls so far.
+var physics_ticks: int = 0
+
 
 func _get_scalar_obs_size() -> int:
 	# Three float32s: [last_action_byte + 10.0, reset_count, episode_state_echo]
@@ -30,13 +33,14 @@ func _apply_message(message: PackedByteArray) -> void:
 
 func _get_info_size() -> int:
 	# int32s: [global index, local index, total envs, reset_count, message_count,
-	# message_count_at_reset], then the last message's 4 bytes.
-	return 28
+	# message_count_at_reset], the last message's 4 bytes, then int32
+	# physics_ticks.
+	return 32
 
 func _collect_info() -> PackedByteArray:
 	var master := get_tree().current_scene as VGAMasterNode
 	var buf := PackedByteArray()
-	buf.resize(28)
+	buf.resize(32)
 	buf.encode_s32(0, get_global_env_index())
 	buf.encode_s32(4, get_local_env_index())
 	buf.encode_s32(8, master.get_total_num_envs() if master else -1)
@@ -45,6 +49,7 @@ func _collect_info() -> PackedByteArray:
 	buf.encode_s32(20, message_count_at_reset)
 	for i in 4:
 		buf[24 + i] = last_message[i]
+	buf.encode_s32(28, physics_ticks)
 	return buf
 
 func _collect_scalar_obs() -> PackedByteArray:
@@ -68,6 +73,9 @@ func _get_episode_state() -> int:
 	if last_action_byte == 254:
 		return TRUNCATED
 	return RUNNING
+
+func _physics_process(_delta: float) -> void:
+	physics_ticks += 1
 
 func _reset() -> void:
 	reset_count += 1

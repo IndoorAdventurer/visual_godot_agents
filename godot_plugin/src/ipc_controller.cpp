@@ -100,17 +100,12 @@ bool IPCController::initialize(
     return true;
 }
 
-bool IPCController::exchange(double p_delta) {
-    // The first exchange only signals that shared memory is ready. Messages
-    // Python sends before its first reset() are dispatched here, so they reach
-    // the agents before the reset at the top of the next exchange.
-    if (d_first_exchange) {
-        d_first_exchange = false;
-        d_posix.step();
-        _dispatch_messages();
-        return true;
-    }
+void IPCController::handshake() {
+    d_posix.step();
+    _dispatch_messages();
+}
 
+bool IPCController::exchange(double p_delta) {
     // Reset environments that finished in the PREVIOUS exchange. We read the
     // terminated/truncated flags written to shm by the previous _write_env_state()
     // call — nothing touches those bytes between then and now, so they are a
